@@ -23,6 +23,7 @@ app.use(cors({
         env.FRONTEND_URL || 'http://localhost:3001',
         'http://localhost:3000',
         'http://localhost:3001',
+        'https://endaeyesusbete.vercel.app'
     ],
     credentials: true,
 }));
