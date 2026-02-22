@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum AcademicYear {
+  YEAR_1
+  YEAR_2
+  YEAR_3
+  YEAR_4
+  YEAR_5
+  YEAR_6
+  YEAR_7
+  YEAR_8
+  POST_GRADUATE
+  GRADUATED
+}
+
+enum Role {
+  MEMBER
+  CLASS_LEADER
+  SUPER_ADMIN
+}
+
+enum Status {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  PENDING_OFFICE_APPROVAL
+}
+
+enum TargetType {
+  ALL
+  CLASS
+  LEADERS
+}
+
+enum PostTargetType {
+  GLOBAL
+  CLASS
+}
+
+enum ReactionType {
+  LIKE
+  DISLIKE
+}
+
+enum NotificationType {
+  POST
+  ANNOUNCEMENT
+  REPLY
+  MESSAGE
+}
+
+model User {
+  id             String       @id @default(uuid()) @db.Uuid
+  username       String       @unique @db.VarChar(255)
+  fullName       String       @db.VarChar(255)
+  sex            Sex
+  department     String       @db.VarChar(255)
+  serviceClassID String       @db.Uuid
+  serviceClass   ServiceClass @relation("UserClass", fields: [serviceClassID], references: [id])
+  classLeaderOf  String?      @db.Uuid
+  leaderOfClass  ServiceClass? @relation("ClassLeader", fields: [classLeaderOf], references: [id])
+  email          String       @unique @db.VarChar(255)
+  phoneNumber    String       @db.VarChar(15)
+  academicYear   AcademicYear
+  passwordHash   String       @db.VarChar(255)
+  role           Role         @default(MEMBER)
+  status         Status       @default(PENDING)
+  profileImage   String?
+  bio            String?      @db.VarChar(200)
+  birthDate      DateTime?    @db.Date
+  birthPlace     String?      @db.VarChar(255)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  createdAnnouncements Announcement[] @relation("AnnouncementCreator")
+  activityLogsAsActor  ActivityLog[]  @relation("ActionActor")
+  activityLogsAsTarget ActivityLog[]  @relation("ActionTarget")
+  warningsReceived     Warning[]      @relation("WarningReceiver")
+  warningsIssued       Warning[]      @relation("WarningIssuer")
+  posts                Post[]         @relation("PostAuthor")
+  reactions            PostReaction[]
+  comments             Comment[]
+  notifications        Notification[] @relation("UserNotifications")
+  notificationsActed   Notification[] @relation("NotificationActor")
+  messagesSent         Message[]      @relation("MessageSender")
+  messagesReceived     Message[]      @relation("MessageReceiver")
+
+  @@map("users")
+}
+
+model ServiceClass {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  leaderID    String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  users         User[]         @relation("UserClass")
+  leaders       User[]         @relation("ClassLeader")
+  announcements Announcement[]
+  posts         Post[]
+
+  @@map("service_classes")
+}
+
+model Announcement {
+  id            String        @id @default(uuid()) @db.Uuid
+  title         String        @db.VarChar(255)
+  content       String        @db.Text
+  targetType    TargetType
+  targetClassID String?       @db.Uuid
+  targetClass   ServiceClass? @relation(fields: [targetClassID], references: [id])
+  createdBy     String        @db.Uuid
+  author        User          @relation("AnnouncementCreator", fields: [createdBy], references: [id])
+  isPinned      Boolean       @default(false)
+  scheduledAt   DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@map("announcements")
+}
+
+model Post {
+  id             String         @id @default(uuid()) @db.Uuid
+  authorID       String         @db.Uuid
+  author         User           @relation("PostAuthor", fields: [authorID], references: [id])
+  title          String         @db.VarChar(255)
+  content        String         @db.Text
+  imageURL       String?
+  targetType     PostTargetType
+  serviceClassID String?        @db.Uuid
+  serviceClass   ServiceClass?  @relation(fields: [serviceClassID], references: [id])
+  isPinned       Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  reactions PostReaction[]
+  comments  Comment[]
+
+  @@map("posts")
+}
+
+model PostReaction {
+  id           String       @id @default(uuid()) @db.Uuid
+  postID       String       @db.Uuid
+  post         Post         @relation(fields: [postID], references: [id], onDelete: Cascade)
+  userID       String       @db.Uuid
+  user         User         @relation(fields: [userID], references: [id])
+  reactionType ReactionType
+  createdAt    DateTime     @default(now())
+
+  @@unique([postID, userID])
+  @@map("post_reactions")
+}
+
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postID    String   @db.Uuid
+  post      Post     @relation(fields: [postID], references: [id], onDelete: Cascade)
+  userID    String   @db.Uuid
+  user      User     @relation(fields: [userID], references: [id])
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  parentCommentID String?   @db.Uuid
+  parentComment   Comment?  @relation("CommentReplies", fields: [parentCommentID], references: [id], onDelete: Cascade)
+  replies         Comment[] @relation("CommentReplies")
+
+  @@map("comments")
+}
+
+model ActivityLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorID      String   @db.Uuid
+  actor        User     @relation("ActionActor", fields: [actorID], references: [id])
+  actionType   String   @db.VarChar(255)
+  targetUserID String?  @db.Uuid
+  targetUser   User?    @relation("ActionTarget", fields: [targetUserID], references: [id])
+  description  String   @db.Text
+  ipAddress    String?  @db.VarChar(45)
+  createdAt    DateTime @default(now())
+
+  @@map("activity_logs")
+}
+
+model Warning {
+  id        String   @id @default(uuid()) @db.Uuid
+  userID    String   @db.Uuid
+  user      User     @relation("WarningReceiver", fields: [userID], references: [id])
+  issuedBy  String   @db.Uuid
+  issuer    User     @relation("WarningIssuer", fields: [issuedBy], references: [id])
+  reason    String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@map("warnings")
+}
+
+model Notification {
+  id         String           @id @default(uuid()) @db.Uuid
+  userID     String           @db.Uuid
+  user       User             @relation("UserNotifications", fields: [userID], references: [id], onDelete: Cascade)
+  actorID    String           @db.Uuid
+  actor      User             @relation("NotificationActor", fields: [actorID], references: [id])
+  type       NotificationType
+  content    String           @db.Text
+  linkTarget String?          @db.VarChar(255)
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+model Message {
+  id         String   @id @default(uuid()) @db.Uuid
+  senderID   String   @db.Uuid
+  sender     User     @relation("MessageSender", fields: [senderID], references: [id])
+  receiverID String   @db.Uuid
+  receiver   User     @relation("MessageReceiver", fields: [receiverID], references: [id])
+  content    String   @db.Text
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@map("messages")
+}
