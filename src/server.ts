@@ -1,7 +1,12 @@
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import app from './app';
 import { env } from './config/env';
 import { db } from './config/db';
+
+// Ensure the uploads directory always exists (important for cloud deployments)
+fs.mkdirSync(path.join(process.cwd(), 'uploads'), { recursive: true });
 
 const server = http.createServer(app);
 
