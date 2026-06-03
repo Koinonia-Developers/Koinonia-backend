@@ -5,7 +5,7 @@ export class NotificationsController {
     async getNotifications(req: Request, res: Response, next: NextFunction) {
         try {
             const data = await notificationsService.getUserNotifications(req.user!);
-            res.status(200).json({ status: 'success', data });
+            res.status(200).json({ items: data.list, unread_count: data.unreadCount });
         } catch (e) { next(e); }
     }
 

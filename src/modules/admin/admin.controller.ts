@@ -17,7 +17,7 @@ export class AdminController {
 
     async getAllUsers(req: Request, res: Response, next: NextFunction) {
         try {
-            const users = await adminService.getAllUsers();
+            const users = await adminService.getAllUsers(req.user!);
             res.status(200).json({ status: 'success', data: users });
         } catch (e) { next(e); }
     }
@@ -38,14 +38,14 @@ export class AdminController {
 
     async suspendUser(req: Request, res: Response, next: NextFunction) {
         try {
-            const user = await adminService.suspendUser(req.user!.userID, req.params.id as string, req.body, getIp(req));
+            const user = await adminService.suspendUser(req.user!.userID, req.user!, req.params.id as string, req.body, getIp(req));
             res.status(200).json({ status: 'success', data: user });
         } catch (e) { next(e); }
     }
 
     async promoteRole(req: Request, res: Response, next: NextFunction) {
         try {
-            const user = await adminService.promoteRole(req.user!.userID, req.params.id as string, req.body, getIp(req));
+            const user = await adminService.promoteRole(req.user!.userID, req.user!, req.params.id as string, req.body, getIp(req));
             res.status(200).json({ status: 'success', data: user });
         } catch (e) { next(e); }
     }
@@ -54,6 +54,29 @@ export class AdminController {
         try {
             const user = await adminService.changeUserClass(req.user!.userID, req.params.id as string, req.body, getIp(req));
             res.status(200).json({ status: 'success', data: user });
+        } catch (e) { next(e); }
+    }
+
+    // ─── Sub-Class Management ───────────────────────────────────────
+
+    async getSubClasses(req: Request, res: Response, next: NextFunction) {
+        try {
+            const data = await adminService.getSubClasses(req.user!);
+            res.status(200).json({ status: 'success', data });
+        } catch (e) { next(e); }
+    }
+
+    async createSubClass(req: Request, res: Response, next: NextFunction) {
+        try {
+            const subClass = await adminService.createSubClass(req.user!.userID, req.user!, req.body, getIp(req));
+            res.status(201).json({ status: 'success', data: subClass });
+        } catch (e) { next(e); }
+    }
+
+    async updateSubClassRoles(req: Request, res: Response, next: NextFunction) {
+        try {
+            const updated = await adminService.updateSubClassRoles(req.user!.userID, req.user!, req.params.id as string, req.body, getIp(req));
+            res.status(200).json({ status: 'success', data: updated });
         } catch (e) { next(e); }
     }
 

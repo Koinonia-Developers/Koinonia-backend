@@ -3,59 +3,65 @@ const bcrypt = require('bcrypt');
 const { randomUUID } = require('crypto');
 require('dotenv').config();
 
-// 12 official service classes (exact names as specified)
 const serviceClasses = [
-    { name: 'ትምህርት ክፍል', description: 'Education Department' },
-    { name: 'መዝሙር ክፍል', description: 'Choir Department' },
-    { name: 'ኪነጥበባት ክፍል', description: 'Arts Department' },
-    { name: 'ባች እና ማስተባበርያ ክፍል', description: 'Coordination Department' },
-    { name: 'ሞያ እና አገልግሎት ክፍል', description: 'Professional Service Department' },
-    { name: 'ልማት ክፍል', description: 'Development Department' },
-    { name: 'ሒሳብና ንብረት ክፍል', description: 'Finance & Property Department' },
-    { name: 'ኦዲት እና ኢንስፔክሽን ክፍል', description: 'Audit & Inspection Department' },
-    { name: 'ስልጠና ክፍል', description: 'Training Department' },
-    { name: 'አባላት ጉዳይ ክፍል', description: 'Member Affairs Department' },
-    { name: 'ፅሕፈት ቤት', description: 'Office — ፅሕፈት ቤት' },
-    { name: 'የለኝም', description: 'Unassigned — no service class' },
+    { class_name_amharic: 'ትምህርት ክፍል', is_public_registration: true },
+    { class_name_amharic: 'መዝሙር ክፍል', is_public_registration: true },
+    { class_name_amharic: 'አባላት ጉዳይ ክፍል', is_public_registration: true },
+    { class_name_amharic: 'ልማት ክፍል', is_public_registration: true },
+    { class_name_amharic: 'ሒሳብና ንብረት ክፍል', is_public_registration: true },
+    { class_name_amharic: 'ሞያና አገልግሎት ክፍል', is_public_registration: true },
+    { class_name_amharic: 'የባች ማስተባበሪያ ክፍል', is_public_registration: true },
+    { class_name_amharic: 'ሳንሱርና መርሐ ግብር ዝግጅት ክፍል', is_public_registration: true },
+    { class_name_amharic: 'ኦዲትና ኢንስፔክሽን ክፍል', is_public_registration: true },
+    { class_name_amharic: 'ፅሕፈት ቤት', is_public_registration: false },
+    { class_name_amharic: 'የለኝም', is_public_registration: false },
 ];
 
 async function runSeed() {
+    const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
+    if (!connectionString) {
+        console.error("❌ DIRECT_URL or DATABASE_URL not specified in environment");
+        process.exit(1);
+    }
+    
+    const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
     const client = new Client({
-        connectionString: process.env.DIRECT_URL,
-        ssl: { rejectUnauthorized: false }
+        connectionString,
+        ssl: isLocal ? false : { rejectUnauthorized: false }
     });
 
     await client.connect();
-    console.log('✅ Connected to Neon DB');
+    console.log('✅ Connected to database for seeding');
 
     const now = new Date();
     let firstClassId = null;
 
-    // Delete any service class NOT in the new 12-class list
-    const validNames = serviceClasses.map(c => c.name);
+    // Clear and upsert service classes
+    const validNames = serviceClasses.map(c => c.class_name_amharic);
     const placeholders = validNames.map((_, i) => `$${i + 1}`).join(', ');
+    
     await client.query(
-        `DELETE FROM "service_classes" WHERE "name" NOT IN (${placeholders})`,
+        `DELETE FROM "service_classes" WHERE "class_name_amharic" NOT IN (${placeholders})`,
         validNames
     );
-    console.log('🗑  Removed stale service classes');
+    console.log('🗑  Cleaned stale service classes');
 
-    // Upsert all 12 service classes in order
+    // Insert classes
     for (const cls of serviceClasses) {
         const id = randomUUID();
         const res = await client.query(
-            `INSERT INTO "service_classes" ("id", "name", "description", "isActive", "createdAt")
-       VALUES ($1, $2, $3, true, $4)
-       ON CONFLICT ("name") DO UPDATE SET "description" = EXCLUDED."description"
-       RETURNING "id"`,
-            [id, cls.name, cls.description, now]
+            `INSERT INTO "service_classes" ("id", "class_name_amharic", "is_public_registration", "created_at", "updated_at")
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT ("class_name_amharic") DO UPDATE SET "is_public_registration" = EXCLUDED."is_public_registration"
+             RETURNING "id"`,
+            [id, cls.class_name_amharic, cls.is_public_registration, now, now]
         );
         if (!firstClassId) firstClassId = res.rows[0].id;
-        console.log('✅ Class:', cls.name);
+        console.log('✅ Class:', cls.class_name_amharic);
     }
 
-    // Get the ፅሕፈት ቤት (class 12) ID for admin
-    const officeRes = await client.query(`SELECT "id" FROM "service_classes" WHERE "name" = 'ፅሕፈት ቤት'`);
+    // Get the ፅሕፈት ቤት ID for admin
+    const officeRes = await client.query(`SELECT "id" FROM "service_classes" WHERE "class_name_amharic" = 'ፅሕፈት ቤት'`);
     const officeClassId = officeRes.rows[0]?.id || firstClassId;
 
     // Upsert admin user
@@ -66,25 +72,20 @@ async function runSeed() {
         const adminId = randomUUID();
         await client.query(
             `INSERT INTO "users" (
-        "id","username","fullName","sex","department","serviceClassID",
-        "email","phoneNumber","academicYear","passwordHash","role","status",
-        "createdAt","updatedAt"
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+                "id", "full_name_three_parts", "email", "password_hash", "system_role", "service_class_id", "created_at", "updated_at"
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [
-                adminId, 'endaeyesus', 'System Administrator', 'MALE', 'Administration', officeClassId,
-                'admin@endaeyesus.com', '0911000000', 'GRADUATED',
-                passwordHash, 'SUPER_ADMIN', 'ACTIVE', now, now
+                adminId, 'System Administrator', 'admin@endaeyesus.com', passwordHash, 'SECRETARIAT_CHAIRMAN', officeClassId, now, now
             ]
         );
-        console.log('✅ Admin created: endaeyesus / 292929 — role: SUPER_ADMIN');
+        console.log('✅ Admin created: admin@endaeyesus.com / 292929 — role: SECRETARIAT_CHAIRMAN');
     } else {
-        // Update role to SUPER_ADMIN and refresh password
         await client.query(
-            `UPDATE "users" SET "role" = 'SUPER_ADMIN', "username" = 'endaeyesus', "passwordHash" = $1, "updatedAt" = $2, "serviceClassID" = $3
-       WHERE "email" = 'admin@endaeyesus.com'`,
+            `UPDATE "users" SET "system_role" = 'SECRETARIAT_CHAIRMAN', "password_hash" = $1, "updated_at" = $2, "service_class_id" = $3
+             WHERE "email" = 'admin@endaeyesus.com'`,
             [passwordHash, now, officeClassId]
         );
-        console.log('✅ Admin updated: endaeyesus / 292929 — role: SUPER_ADMIN');
+        console.log('✅ Admin updated: admin@endaeyesus.com / 292929 — role: SECRETARIAT_CHAIRMAN');
     }
 
     await client.end();

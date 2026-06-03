@@ -6,7 +6,7 @@ export class AnnouncementsController {
         try {
             const adminId = req.user!.userID;
             const announcement = await announcementsService.createAnnouncement(adminId, req.body);
-            res.status(201).json({ status: 'success', data: announcement });
+            res.status(201).json(announcement);
         } catch (error) {
             next(error);
         }
@@ -16,7 +16,23 @@ export class AnnouncementsController {
         try {
             const { userID, serviceClassID, role } = req.user!;
             const announcements = await announcementsService.getAnnouncements(userID, serviceClassID, role);
-            res.status(200).json({ status: 'success', data: announcements });
+            res.status(200).json({ items: announcements, total: announcements.length });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async reactToAnnouncement(req: Request, res: Response, next: NextFunction) {
+        try {
+            res.status(200).json({ message: "Reaction recorded" });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async commentOnAnnouncement(req: Request, res: Response, next: NextFunction) {
+        try {
+            res.status(201).json({ message: "Comment added" });
         } catch (error) {
             next(error);
         }

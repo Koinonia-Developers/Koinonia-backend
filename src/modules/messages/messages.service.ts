@@ -11,19 +11,30 @@ export class MessagesService {
 
     async searchUsers(user: JwtPayload, query: string) {
         if (!query || query.length < 2) return [];
-        return db.user.findMany({
+        const users = await db.user.findMany({
             where: {
                 id: { not: user.userID },
                 OR: [
-                    { fullName: { contains: query, mode: 'insensitive' } },
-                    { username: { contains: query, mode: 'insensitive' } }
+                    { full_name_three_parts: { contains: query, mode: 'insensitive' } },
+                    { email: { contains: query, mode: 'insensitive' } }
                 ],
-                // Members can only message leaders and admins
-                ...(user.role === 'MEMBER' ? { role: { in: ['CLASS_LEADER', 'SUPER_ADMIN'] } } : {})
+                ...(user.role === 'MEMBER' ? {
+                    system_role: {
+                        in: ['SERVICE_MANAGER', 'SECRETARIAT_SECRETARY', 'SECRETARIAT_VICE', 'SECRETARIAT_CHAIRMAN']
+                    }
+                } : {})
             },
-            select: { id: true, fullName: true, profileImage: true, username: true, role: true },
+            select: { id: true, full_name_three_parts: true, profile_image_url: true, email: true, system_role: true },
             take: 10
         });
+
+        return users.map(u => ({
+            id: u.id,
+            fullName: u.full_name_three_parts,
+            profileImage: u.profile_image_url,
+            username: u.email,
+            role: u.system_role
+        }));
     }
 
     async getChatHistory(user: JwtPayload, otherUserId: string) {
@@ -36,7 +47,7 @@ export class MessagesService {
         if (!receiver) throw new NotFoundError('Receiver not found');
 
         if (user.role === 'MEMBER') {
-            if (receiver.role === 'MEMBER') {
+            if (receiver.system_role === 'MEMBER' || receiver.system_role === 'USER') {
                 throw new ForbiddenError('Members cannot message other members directly');
             }
         }

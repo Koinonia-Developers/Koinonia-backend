@@ -9,18 +9,14 @@ const SALT_ROUNDS = 12;
 
 const generateToken = (user: {
     id: string;
-    role: string;
-    serviceClassID: string;
-    classLeaderOf?: string | null;
-    status: string;
+    system_role: string;
+    service_class_id?: string | null;
 }) => {
     return jwt.sign(
         {
             userID: user.id,
-            role: user.role,
-            serviceClassID: user.serviceClassID,
-            classLeaderOf: user.classLeaderOf ?? null,
-            status: user.status,
+            role: user.system_role,
+            serviceClassID: user.service_class_id ?? null,
         },
         env.JWT_SECRET,
         { expiresIn: '7d' }
@@ -29,42 +25,41 @@ const generateToken = (user: {
 
 export class AuthService {
     async register(data: RegisterInput) {
-        const [existingUsername, existingEmail] = await Promise.all([
-            authRepository.findByUsername(data.username),
-            authRepository.findByEmail(data.email),
-        ]);
-
-        if (existingUsername) throw new ConflictError('Username already taken');
+        const existingEmail = await authRepository.findByEmail(data.email);
         if (existingEmail) throw new ConflictError('Email already registered');
 
         const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
 
         const user = await authRepository.createUser({
-            ...data,
+            full_name_three_parts: data.full_name_three_parts,
+            email: data.email,
             passwordHash,
         });
 
         const token = generateToken(user);
-        const { passwordHash: _, ...userWithoutPassword } = user as any;
+        const { password_hash: _, ...userWithoutPassword } = user as any;
 
         return { user: userWithoutPassword, token };
     }
 
     async login(data: LoginInput) {
-        const user = await authRepository.findByUsername(data.username);
-        if (!user) throw new UnauthorizedError('Invalid username or password');
+        const user = await authRepository.findByEmail(data.email);
+        if (!user) throw new UnauthorizedError('Invalid email or password');
 
-        const isPasswordValid = await bcrypt.compare(data.password, user.passwordHash);
-        if (!isPasswordValid) throw new UnauthorizedError('Invalid username or password');
-
-        if (user.status === 'SUSPENDED') {
-            throw new ForbiddenError('Your account has been suspended. Contact admin.');
-        }
+        const isPasswordValid = await bcrypt.compare(data.password, user.password_hash);
+        if (!isPasswordValid) throw new UnauthorizedError('Invalid email or password');
 
         const token = generateToken(user);
-        const { passwordHash: _, ...userWithoutPassword } = user as any;
+        const { password_hash: _, ...userWithoutPassword } = user as any;
 
         return { user: userWithoutPassword, token };
+    }
+
+    async getUserById(id: string) {
+        const user = await authRepository.findById(id);
+        if (!user) return null;
+        const { password_hash: _, ...userWithoutPassword } = user as any;
+        return userWithoutPassword;
     }
 }
 

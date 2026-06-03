@@ -1,14 +1,17 @@
 import { adminRepository } from './admin.repository';
-import { NotFoundError, BadRequestError } from '../../utils/errors';
+import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/errors';
 import { PromoteLeaderInput, ChangeClassInput, SuspendInput, PromoteRoleInput } from './admin.schema';
 import { db } from '../../config/db';
 
 export class AdminService {
-    async getDashboardStats() {
+    async getDashboardStats(_requester?: any) {
         return adminRepository.getDashboardStats();
     }
 
-    async getAllUsers() {
+    async getAllUsers(requester: any) {
+        if (requester.role === 'SERVICE_MANAGER') {
+            return adminRepository.getAllUsers(requester.serviceClassID);
+        }
         return adminRepository.getAllUsers();
     }
 
@@ -38,24 +41,39 @@ export class AdminService {
         return updated;
     }
 
-    async suspendUser(adminId: string, targetId: string, body: SuspendInput, ip?: string) {
+    async suspendUser(adminId: string, requester: any, targetId: string, body: SuspendInput, ip?: string) {
         const user = await adminRepository.findUserById(targetId);
         if (!user) throw new NotFoundError('User not found');
         if (user.id === adminId) throw new BadRequestError('Cannot suspend yourself');
+
+        if (requester.role === 'SERVICE_MANAGER' && user.serviceClassID !== requester.serviceClassID) {
+            throw new ForbiddenError('You can only suspend members of your own class');
+        }
 
         const updated = await adminRepository.updateUser(targetId, { status: 'SUSPENDED' });
         await adminRepository.logActivity({
             actorID: adminId, actionType: 'SUSPEND_USER',
             targetUserID: targetId, description: `Suspended ${user.username}: ${body.reason}`, ipAddress: ip
         });
-        await db.warning.create({ data: { userID: targetId, issuedBy: adminId, reason: body.reason } });
         return updated;
     }
 
-    async promoteRole(adminId: string, targetId: string, body: PromoteRoleInput, ip?: string) {
+    async promoteRole(adminId: string, requester: any, targetId: string, body: PromoteRoleInput, ip?: string) {
         const user = await adminRepository.findUserById(targetId);
         if (!user) throw new NotFoundError('User not found');
         if (user.id === adminId) throw new BadRequestError('Cannot change your own role');
+
+        // Education Manager Domain Lock
+        if (body.role === 'TEACHER') {
+            if (requester.role === 'SERVICE_MANAGER') {
+                const requesterClass = await db.serviceClass.findUnique({ where: { id: requester.serviceClassID } });
+                if (requesterClass?.class_name_amharic !== 'ትምህርት ክፍል') {
+                    throw new ForbiddenError('Only the Education Manager can grant TEACHER roles');
+                }
+            }
+        } else if (requester.role === 'SERVICE_MANAGER') {
+            throw new ForbiddenError('Service Managers cannot arbitrarily change system roles');
+        }
 
         const updated = await adminRepository.updateUser(targetId, { role: body.role });
         await adminRepository.logActivity({
@@ -77,7 +95,7 @@ export class AdminService {
         await adminRepository.logActivity({
             actorID: adminId, actionType: 'CHANGE_CLASS',
             targetUserID: targetId,
-            description: `Moved ${user.username} to class ${cls.name}`, ipAddress: ip
+            description: `Moved ${user.username} to class ${cls.class_name_amharic}`, ipAddress: ip
         });
         return updated;
     }
@@ -90,19 +108,15 @@ export class AdminService {
         const cls = await db.serviceClass.findUnique({ where: { id: body.classID } });
         if (!cls) throw new NotFoundError('Service class not found');
 
-        // Update user: role=CLASS_LEADER, classLeaderOf=classID
         const updatedUser = await adminRepository.updateUser(targetId, {
-            role: 'CLASS_LEADER',
-            classLeaderOf: body.classID,
+            role: 'SERVICE_MANAGER',
+            serviceClassID: body.classID,
         });
-
-        // Update service_class: leaderID=userID
-        await db.serviceClass.update({ where: { id: body.classID }, data: { leaderID: targetId } });
 
         await adminRepository.logActivity({
             actorID: adminId, actionType: 'PROMOTE_LEADER',
             targetUserID: targetId,
-            description: `${user.username} promoted to CLASS_LEADER of ${cls.name}`, ipAddress: ip
+            description: `${user.username} promoted to SERVICE_MANAGER of ${cls.class_name_amharic}`, ipAddress: ip
         });
         return updatedUser;
     }
@@ -110,19 +124,10 @@ export class AdminService {
     async demoteLeader(adminId: string, targetId: string, ip?: string) {
         const user = await adminRepository.findUserById(targetId);
         if (!user) throw new NotFoundError('User not found');
-        if (user.role !== 'CLASS_LEADER') throw new BadRequestError('User is not a CLASS_LEADER');
-
-        // Remove from class leader spot
-        if (user.classLeaderOf) {
-            await db.serviceClass.update({
-                where: { id: user.classLeaderOf },
-                data: { leaderID: null }
-            });
-        }
+        if (user.role !== 'SERVICE_MANAGER') throw new BadRequestError('User is not a SERVICE_MANAGER');
 
         const updatedUser = await adminRepository.updateUser(targetId, {
             role: 'MEMBER',
-            classLeaderOf: null,
         });
 
         await adminRepository.logActivity({
@@ -131,6 +136,44 @@ export class AdminService {
             description: `${user.username} demoted to MEMBER`, ipAddress: ip
         });
         return updatedUser;
+    }
+
+    // ─── Sub-Class Management ───────────────────────────────────────
+    async getSubClasses(requester: any) {
+        if (requester.role === 'SERVICE_MANAGER') {
+            return adminRepository.getSubClasses(requester.serviceClassID);
+        }
+        return adminRepository.getSubClasses();
+    }
+
+    async createSubClass(adminId: string, requester: any, body: { name: string }, ip?: string) {
+        if (!requester.serviceClassID) throw new BadRequestError('You do not belong to a service class');
+        
+        const subClass = await adminRepository.createSubClass(requester.serviceClassID, body.name);
+        
+        await adminRepository.logActivity({
+            actorID: adminId, actionType: 'CREATE_SUBCLASS',
+            description: `Created sub-class ${body.name}`, ipAddress: ip
+        });
+        return subClass;
+    }
+
+    async updateSubClassRoles(adminId: string, requester: any, subClassId: string, body: any, ip?: string) {
+        // Enforce same-class scope
+        const subClass = await db.sub_classes.findUnique({ where: { id: subClassId } });
+        if (!subClass) throw new NotFoundError('Sub-class not found');
+
+        if (requester.role === 'SERVICE_MANAGER' && subClass.parent_class_id !== requester.serviceClassID) {
+            throw new ForbiddenError('You can only modify sub-classes in your own department');
+        }
+
+        const updated = await adminRepository.updateSubClassRoles(subClassId, body);
+        
+        await adminRepository.logActivity({
+            actorID: adminId, actionType: 'UPDATE_SUBCLASS_ROLES',
+            description: `Updated roles for sub-class ${subClass.sub_class_name}`, ipAddress: ip
+        });
+        return updated;
     }
 
     // ─── Office (ፅሕፈት ቤት) ──────────────────────────────────────────

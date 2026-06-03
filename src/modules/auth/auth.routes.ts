@@ -26,4 +26,11 @@ router.post(
     authController.login
 );
 
+import { requireAuth } from '../../middleware/auth';
+router.get(
+    '/me',
+    requireAuth,
+    authController.getCurrentUser
+);
+
 export default router;

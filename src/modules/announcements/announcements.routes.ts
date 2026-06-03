@@ -19,4 +19,20 @@ router.post(
     announcementsController.createAnnouncement
 );
 
+// POST /announcements/:id/reactions
+router.post(
+    '/:id/reactions',
+    requireAuth,
+    requireActiveStatus,
+    announcementsController.reactToAnnouncement
+);
+
+// POST /announcements/:id/comments
+router.post(
+    '/:id/comments',
+    requireAuth,
+    requireActiveStatus,
+    announcementsController.commentOnAnnouncement
+);
+
 export default router;

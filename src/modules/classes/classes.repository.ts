@@ -2,15 +2,18 @@ import { db } from '../../config/db';
 
 export class ClassesRepository {
     async getAllActiveClasses() {
-        return db.serviceClass.findMany({
-            where: { isActive: true },
+        const classes = await db.serviceClass.findMany({
+            where: { is_public_registration: true },
             select: {
                 id: true,
-                name: true,
-                description: true
+                class_name_amharic: true
             },
-            orderBy: { name: 'asc' }
+            orderBy: { class_name_amharic: 'asc' }
         });
+        return classes.map(c => ({
+            id: c.id,
+            name: c.class_name_amharic
+        }));
     }
 }
 

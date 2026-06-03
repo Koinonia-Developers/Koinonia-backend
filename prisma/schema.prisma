@@ -8,230 +8,300 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-enum Sex {
-  MALE
-  FEMALE
-}
-
-enum AcademicYear {
-  YEAR_1
-  YEAR_2
-  YEAR_3
-  YEAR_4
-  YEAR_5
-  YEAR_6
-  YEAR_7
-  YEAR_8
-  POST_GRADUATE
-  GRADUATED
-}
-
-enum Role {
-  MEMBER
-  CLASS_LEADER
-  SUPER_ADMIN
-}
-
-enum Status {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  PENDING_OFFICE_APPROVAL
-}
-
-enum TargetType {
-  ALL
-  CLASS
-  LEADERS
-}
-
-enum PostTargetType {
-  GLOBAL
-  CLASS
-}
-
-enum ReactionType {
-  LIKE
-  DISLIKE
-}
-
-enum NotificationType {
-  POST
-  ANNOUNCEMENT
-  REPLY
-  MESSAGE
-}
-
 model User {
-  id             String       @id @default(uuid()) @db.Uuid
-  username       String       @unique @db.VarChar(255)
-  fullName       String       @db.VarChar(255)
-  sex            Sex
-  department     String       @db.VarChar(255)
-  serviceClassID String       @db.Uuid
-  serviceClass   ServiceClass @relation("UserClass", fields: [serviceClassID], references: [id])
-  classLeaderOf  String?      @db.Uuid
-  leaderOfClass  ServiceClass? @relation("ClassLeader", fields: [classLeaderOf], references: [id])
-  email          String       @unique @db.VarChar(255)
-  phoneNumber    String       @db.VarChar(15)
-  academicYear   AcademicYear
-  passwordHash   String       @db.VarChar(255)
-  role           Role         @default(MEMBER)
-  status         Status       @default(PENDING)
-  profileImage   String?
-  bio            String?      @db.VarChar(200)
-  birthDate      DateTime?    @db.Date
-  birthPlace     String?      @db.VarChar(255)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                                                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name_three_parts                                   String               @db.VarChar(150)
+  email                                                   String               @unique(map: "idx_users_email") @db.VarChar(100)
+  password_hash                                           String               @db.VarChar(255)
+  university_id                                           String?              @unique @db.VarChar(50)
+  academic_dept                                           String?              @db.VarChar(100)
+  academic_year                                           Int?
+  dorm_block                                              String?              @db.VarChar(20)
+  dorm_room                                               String?              @db.VarChar(20)
+  phone_number                                            String?              @db.VarChar(20)
+  profile_image_url                                       String?              @default("/assets/avatar.png") @db.VarChar(255)
+  bio                                                     String?
+  system_role                                             system_role          @default(USER)
+  service_class_id                                        String?              @db.Uuid
+  pending_class_id                                        String?              @db.Uuid
+  repentance_father_id                                    String?              @db.Uuid
+  repentance_deacon_id                                    String?              @db.Uuid
+  spiritual_father_id                                     String?              @db.Uuid
+  spiritual_mother_id                                     String?              @db.Uuid
+  created_at                                              DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                                              DateTime             @default(now()) @db.Timestamptz(6)
+  created_by                                              String?              @db.Uuid
+  updated_by                                              String?              @db.Uuid
+  announcements                                           Announcement[]
+  comments                                                Comment[]
+  course_submissions_course_submissions_created_byTousers course_submissions[] @relation("course_submissions_created_byTousers")
+  course_submissions_course_submissions_teacher_idTousers course_submissions[] @relation("course_submissions_teacher_idTousers")
+  lms_enrollments                                         lms_enrollments[]
+  notifications                                           Notification[]
+  reactions                                               reactions[]
+  sub_classes_sub_classes_sub_chair_idTousers             sub_classes[]        @relation("sub_classes_sub_chair_idTousers")
+  sub_classes_sub_classes_sub_secretary_idTousers         sub_classes[]        @relation("sub_classes_sub_secretary_idTousers")
+  sub_classes_sub_classes_sub_vice_idTousers              sub_classes[]        @relation("sub_classes_sub_vice_idTousers")
+  users_users_created_byTousers                           User?                @relation("users_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
+  other_users_users_created_byTousers                     User[]               @relation("users_created_byTousers")
+  users_users_repentance_deacon_idTousers                 User?                @relation("users_repentance_deacon_idTousers", fields: [repentance_deacon_id], references: [id], onUpdate: NoAction)
+  other_users_users_repentance_deacon_idTousers           User[]               @relation("users_repentance_deacon_idTousers")
+  users_users_repentance_father_idTousers                 User?                @relation("users_repentance_father_idTousers", fields: [repentance_father_id], references: [id], onUpdate: NoAction)
+  other_users_users_repentance_father_idTousers           User[]               @relation("users_repentance_father_idTousers")
+  service_classes                                         ServiceClass?        @relation(fields: [service_class_id], references: [id], onUpdate: NoAction)
+  users_users_spiritual_father_idTousers                  User?                @relation("users_spiritual_father_idTousers", fields: [spiritual_father_id], references: [id], onUpdate: NoAction)
+  other_users_users_spiritual_father_idTousers            User[]               @relation("users_spiritual_father_idTousers")
+  users_users_spiritual_mother_idTousers                  User?                @relation("users_spiritual_mother_idTousers", fields: [spiritual_mother_id], references: [id], onUpdate: NoAction)
+  other_users_users_spiritual_mother_idTousers            User[]               @relation("users_spiritual_mother_idTousers")
+  users_users_updated_byTousers                           User?                @relation("users_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction)
+  other_users_users_updated_byTousers                     User[]               @relation("users_updated_byTousers")
 
-  createdAnnouncements Announcement[] @relation("AnnouncementCreator")
-  activityLogsAsActor  ActivityLog[]  @relation("ActionActor")
-  activityLogsAsTarget ActivityLog[]  @relation("ActionTarget")
-  warningsReceived     Warning[]      @relation("WarningReceiver")
-  warningsIssued       Warning[]      @relation("WarningIssuer")
-  posts                Post[]         @relation("PostAuthor")
-  reactions            PostReaction[]
-  comments             Comment[]
-  notifications        Notification[] @relation("UserNotifications")
-  notificationsActed   Notification[] @relation("NotificationActor")
-  messagesSent         Message[]      @relation("MessageSender")
-  messagesReceived     Message[]      @relation("MessageReceiver")
-
+  @@index([created_at], map: "idx_users_created_at")
+  @@index([repentance_father_id], map: "idx_users_repentance_father_id")
+  @@index([service_class_id], map: "idx_users_service_class_id")
+  @@index([system_role], map: "idx_users_system_role")
+  @@index([university_id], map: "idx_users_university_id")
   @@map("users")
 }
 
 model ServiceClass {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
-  description String?
-  isActive    Boolean  @default(true)
-  leaderID    String?  @db.Uuid
-  createdAt   DateTime @default(now())
-
-  users         User[]         @relation("UserClass")
-  leaders       User[]         @relation("ClassLeader")
-  announcements Announcement[]
-  posts         Post[]
+  id                     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  class_name_amharic     String         @unique @db.VarChar(100)
+  is_public_registration Boolean        @default(true)
+  created_at             DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime       @default(now()) @db.Timestamptz(6)
+  announcements          Announcement[]
+  sub_classes            sub_classes[]
+  users                  User[]
 
   @@map("service_classes")
 }
 
 model Announcement {
-  id            String        @id @default(uuid()) @db.Uuid
-  title         String        @db.VarChar(255)
-  content       String        @db.Text
-  targetType    TargetType
-  targetClassID String?       @db.Uuid
-  targetClass   ServiceClass? @relation(fields: [targetClassID], references: [id])
-  createdBy     String        @db.Uuid
-  author        User          @relation("AnnouncementCreator", fields: [createdBy], references: [id])
-  isPinned      Boolean       @default(false)
-  scheduledAt   DateTime?
-  createdAt     DateTime      @default(now())
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String        @db.VarChar(200)
+  content         String
+  is_public       Boolean       @default(true)
+  target_class_id String?       @db.Uuid
+  author_id       String        @db.Uuid
+  published_at    DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime      @default(now()) @db.Timestamptz(6)
+  users           User          @relation(fields: [author_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service_classes ServiceClass? @relation(fields: [target_class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  comments        Comment[]
+  reactions       reactions[]
 
+  @@index([is_public, published_at], map: "idx_announcements_is_public_published_at")
+  @@index([target_class_id], map: "idx_announcements_target_class_id")
   @@map("announcements")
 }
 
-model Post {
-  id             String         @id @default(uuid()) @db.Uuid
-  authorID       String         @db.Uuid
-  author         User           @relation("PostAuthor", fields: [authorID], references: [id])
-  title          String         @db.VarChar(255)
-  content        String         @db.Text
-  imageURL       String?
-  targetType     PostTargetType
-  serviceClassID String?        @db.Uuid
-  serviceClass   ServiceClass?  @relation(fields: [serviceClassID], references: [id])
-  isPinned       Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-
-  reactions PostReaction[]
-  comments  Comment[]
-
-  @@map("posts")
-}
-
-model PostReaction {
-  id           String       @id @default(uuid()) @db.Uuid
-  postID       String       @db.Uuid
-  post         Post         @relation(fields: [postID], references: [id], onDelete: Cascade)
-  userID       String       @db.Uuid
-  user         User         @relation(fields: [userID], references: [id])
-  reactionType ReactionType
-  createdAt    DateTime     @default(now())
-
-  @@unique([postID, userID])
-  @@map("post_reactions")
-}
-
 model Comment {
-  id        String   @id @default(uuid()) @db.Uuid
-  postID    String   @db.Uuid
-  post      Post     @relation(fields: [postID], references: [id], onDelete: Cascade)
-  userID    String   @db.Uuid
-  user      User     @relation(fields: [userID], references: [id])
-  content   String   @db.Text
-  createdAt DateTime @default(now())
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  announcement_id   String       @db.Uuid
+  parent_comment_id String?      @db.Uuid
+  author_id         String       @db.Uuid
+  content           String
+  created_at        DateTime     @default(now()) @db.Timestamptz(6)
+  announcements     Announcement @relation(fields: [announcement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users             User         @relation(fields: [author_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  comments          Comment?     @relation("commentsTocomments", fields: [parent_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  other_comments    Comment[]    @relation("commentsTocomments")
 
-  parentCommentID String?   @db.Uuid
-  parentComment   Comment?  @relation("CommentReplies", fields: [parentCommentID], references: [id], onDelete: Cascade)
-  replies         Comment[] @relation("CommentReplies")
-
+  @@index([announcement_id], map: "idx_comments_announcement_id")
   @@map("comments")
 }
 
-model ActivityLog {
-  id           String   @id @default(uuid()) @db.Uuid
-  actorID      String   @db.Uuid
-  actor        User     @relation("ActionActor", fields: [actorID], references: [id])
-  actionType   String   @db.VarChar(255)
-  targetUserID String?  @db.Uuid
-  targetUser   User?    @relation("ActionTarget", fields: [targetUserID], references: [id])
-  description  String   @db.Text
-  ipAddress    String?  @db.VarChar(45)
-  createdAt    DateTime @default(now())
-
-  @@map("activity_logs")
-}
-
-model Warning {
-  id        String   @id @default(uuid()) @db.Uuid
-  userID    String   @db.Uuid
-  user      User     @relation("WarningReceiver", fields: [userID], references: [id])
-  issuedBy  String   @db.Uuid
-  issuer    User     @relation("WarningIssuer", fields: [issuedBy], references: [id])
-  reason    String   @db.Text
-  createdAt DateTime @default(now())
-
-  @@map("warnings")
-}
-
 model Notification {
-  id         String           @id @default(uuid()) @db.Uuid
-  userID     String           @db.Uuid
-  user       User             @relation("UserNotifications", fields: [userID], references: [id], onDelete: Cascade)
-  actorID    String           @db.Uuid
-  actor      User             @relation("NotificationActor", fields: [actorID], references: [id])
-  type       NotificationType
-  content    String           @db.Text
-  linkTarget String?          @db.VarChar(255)
-  isRead     Boolean          @default(false)
-  createdAt  DateTime         @default(now())
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.Uuid
+  title        String   @db.VarChar(200)
+  message      String
+  target_route String?  @db.VarChar(200)
+  is_read      Boolean  @default(false)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  users        User     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@index([user_id, is_read, created_at], map: "idx_notifications_user_id_is_read_created_at")
   @@map("notifications")
 }
 
-model Message {
-  id         String   @id @default(uuid()) @db.Uuid
-  senderID   String   @db.Uuid
-  sender     User     @relation("MessageSender", fields: [senderID], references: [id])
-  receiverID String   @db.Uuid
-  receiver   User     @relation("MessageReceiver", fields: [receiverID], references: [id])
-  content    String   @db.Text
-  isRead     Boolean  @default(false)
-  createdAt  DateTime @default(now())
+/// This table is a partition table and requires additional setup for migrations. Visit https://pris.ly/d/partition-tables for more info.
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model audit_logs {
+  id          String?  @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String?  @db.Uuid
+  action      String   @db.VarChar(50)
+  entity_type String   @db.VarChar(50)
+  entity_id   String?  @db.Uuid
+  old_state   Json?
+  new_state   Json?
+  ip_address  String?  @db.Inet
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  @@map("messages")
+  @@index([created_at], map: "idx_audit_logs_created_at")
+  @@index([entity_type, entity_id], map: "idx_audit_logs_entity")
+  @@ignore
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model course_submissions {
+  id                                         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teacher_id                                 String            @db.Uuid
+  batch_id                                   String            @db.Uuid
+  title                                      String            @db.VarChar(200)
+  content_package                            String
+  status                                     submission_status @default(DRAFT)
+  review_feedback                            String?
+  implemented_page_url                       String?           @db.VarChar(500)
+  submitted_at                               DateTime?         @db.Timestamptz(6)
+  reviewed_at                                DateTime?         @db.Timestamptz(6)
+  implemented_at                             DateTime?         @db.Timestamptz(6)
+  published_at                               DateTime?         @db.Timestamptz(6)
+  created_by                                 String?           @db.Uuid
+  created_at                                 DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at                                 DateTime          @default(now()) @db.Timestamptz(6)
+  lms_batches                                lms_batches       @relation(fields: [batch_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_course_submissions_created_byTousers User?             @relation("course_submissions_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_course_submissions_teacher_idTousers User              @relation("course_submissions_teacher_idTousers", fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([batch_id, status], map: "idx_course_submissions_batch_id_status")
+  @@index([teacher_id], map: "idx_course_submissions_teacher_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model library_items {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title               String           @db.VarChar(200)
+  description         String?
+  drive_url           String           @db.VarChar(500)
+  category            library_category
+  academic_department String?          @db.VarChar(100)
+  academic_year       Int?
+  course_id           String?          @db.VarChar(50)
+  document_type       document_type?
+  likes               Int              @default(0)
+  downloads           Int              @default(0)
+  is_link_broken      Boolean          @default(false)
+  last_checked_at     DateTime?        @db.Timestamptz(6)
+  created_at          DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime         @default(now()) @db.Timestamptz(6)
+
+  @@index([academic_department], map: "idx_library_items_academic_department")
+  @@index([category], map: "idx_library_items_category")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model lms_batches {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  course_track       course_track
+  batch_number       Int
+  status             batch_status         @default(ACTIVE)
+  academic_year      Int
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  course_submissions course_submissions[]
+  lms_enrollments    lms_enrollments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model lms_enrollments {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String      @db.Uuid
+  batch_id          String      @db.Uuid
+  completed_lessons Json        @default("[]")
+  quiz_scores       Json        @default("{}")
+  final_exam_score  Decimal?    @db.Decimal(5, 2)
+  is_passed         Boolean     @default(false)
+  certificate_hash  String?     @unique @db.VarChar(255)
+  enrolled_at       DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime    @default(now()) @db.Timestamptz(6)
+  lms_batches       lms_batches @relation(fields: [batch_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users             User        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, batch_id])
+  @@index([batch_id], map: "idx_lms_enrollments_batch_id")
+  @@index([is_passed], map: "idx_lms_enrollments_is_passed")
+  @@index([user_id], map: "idx_lms_enrollments_user_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model reactions {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  announcement_id String        @db.Uuid
+  user_id         String        @db.Uuid
+  reaction_type   reaction_type
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  announcements   Announcement  @relation(fields: [announcement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           User          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([announcement_id, user_id])
+  @@index([announcement_id, user_id], map: "idx_reactions_announcement_id_user_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model sub_classes {
+  id                                        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parent_class_id                           String       @db.Uuid
+  sub_class_name                            String       @db.VarChar(100)
+  sub_chair_id                              String?      @db.Uuid
+  sub_vice_id                               String?      @db.Uuid
+  sub_secretary_id                          String?      @db.Uuid
+  created_at                                DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at                                DateTime     @default(now()) @db.Timestamptz(6)
+  service_classes                           ServiceClass @relation(fields: [parent_class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_sub_classes_sub_chair_idTousers     User?        @relation("sub_classes_sub_chair_idTousers", fields: [sub_chair_id], references: [id], onUpdate: NoAction)
+  users_sub_classes_sub_secretary_idTousers User?        @relation("sub_classes_sub_secretary_idTousers", fields: [sub_secretary_id], references: [id], onUpdate: NoAction)
+  users_sub_classes_sub_vice_idTousers      User?        @relation("sub_classes_sub_vice_idTousers", fields: [sub_vice_id], references: [id], onUpdate: NoAction)
+}
+
+enum batch_status {
+  ACTIVE
+  GRADUATED
+}
+
+enum course_track {
+  GUBAE_ABEW
+  GUBAE_HAWARYAT
+  GUBAE_ECCLESIAE
+}
+
+enum document_type {
+  TEXTBOOK
+  PAST_EXAM
+}
+
+enum library_category {
+  SPIRITUAL
+  ACADEMIC
+  OTHER
+}
+
+enum reaction_type {
+  LIKE
+  STAR
+}
+
+enum submission_status {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  IMPLEMENTATION_IN_PROGRESS
+  PUBLISHED
+}
+
+enum system_role {
+  USER
+  MEMBER
+  TEACHER
+  SERVICE_MANAGER
+  SECRETARIAT_SECRETARY
+  SECRETARIAT_VICE
+  SECRETARIAT_CHAIRMAN
 }

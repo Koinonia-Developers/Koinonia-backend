@@ -17,14 +17,12 @@ export class AnnouncementsService {
             throw new BadRequestError('targetClassID is required when targetType is CLASS');
         }
 
-        const payload: Prisma.AnnouncementCreateInput = {
+        const payload = {
             title: data.title,
             content: data.content,
-            targetType: data.targetType,
-            isPinned: data.isPinned || false,
-            author: { connect: { id: adminId } },
-            ...(data.targetClassID && { targetClass: { connect: { id: data.targetClassID } } }),
-            ...(data.scheduledAt && { scheduledAt: new Date(data.scheduledAt) })
+            is_public: data.targetType === 'ALL',
+            target_class_id: data.targetType === 'CLASS' ? data.targetClassID : null,
+            author_id: adminId
         };
 
         const announcement = await this.repo.createAnnouncement(payload);
@@ -34,10 +32,17 @@ export class AnnouncementsService {
             const users = await db.user.findMany({ select: { id: true } });
             targetUserIds = users.map(u => u.id);
         } else if (data.targetType === 'CLASS' && data.targetClassID) {
-            const users = await db.user.findMany({ where: { serviceClassID: data.targetClassID }, select: { id: true } });
+            const users = await db.user.findMany({ where: { service_class_id: data.targetClassID }, select: { id: true } });
             targetUserIds = users.map(u => u.id);
         } else if (data.targetType === 'LEADERS') {
-            const users = await db.user.findMany({ where: { role: { in: ['CLASS_LEADER', 'SUPER_ADMIN'] } }, select: { id: true } });
+            const users = await db.user.findMany({
+                where: {
+                    system_role: {
+                        in: ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SERVICE_MANAGER', 'TEACHER']
+                    }
+                },
+                select: { id: true }
+            });
             targetUserIds = users.map(u => u.id);
         }
 

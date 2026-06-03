@@ -13,6 +13,8 @@ import postsRoutes from './modules/posts/posts.routes';
 import uploadRoutes from './modules/upload/upload.routes';
 import notificationsRoutes from './modules/notifications/notifications.routes';
 import messagesRoutes from './modules/messages/messages.routes';
+import libraryRoutes from './modules/library/library.routes';
+import membershipRoutes from './modules/membership/membership.routes';
 
 const app: Application = express();
 
@@ -31,6 +33,8 @@ app.use(cors({
 // ─── Body Parsing ───────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+import cookieParser from 'cookie-parser';
+app.use(cookieParser());
 
 // ─── Static Files (uploaded images) ────────────────────────────────
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
@@ -44,6 +48,8 @@ app.use('/api/v1/posts', postsRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/messages', messagesRoutes);
+app.use('/api/v1/library', libraryRoutes);
+app.use('/api/v1/membership', membershipRoutes);
 
 // ─── Health Check ───────────────────────────────────────────────────
 app.get('/health', (_req, res) => {

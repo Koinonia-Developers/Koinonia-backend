@@ -27,12 +27,11 @@ export class PostsService {
             if (!cls) throw new NotFoundError('Service class not found');
         }
 
-        await db.activityLog.create({
-            data: {
-                actorID: user.userID, actionType: 'CREATE_POST',
-                description: `Created post: "${body.title}"`,
-            },
-        });
+        // Activity logging via audit_logs (no Prisma model – fire-and-forget raw SQL)
+        db.$executeRawUnsafe(
+            `INSERT INTO audit_logs (user_id, action, entity_type, new_state) VALUES ($1, $2, $3, $4)`,
+            user.userID, 'CREATE_POST', 'POST', JSON.stringify({ title: body.title })
+        ).catch(e => console.error('audit_log insert failed:', e));
 
         const post = await postsRepository.createPost({ authorID: user.userID, ...body });
 
@@ -42,7 +41,7 @@ export class PostsService {
             const users = await db.user.findMany({ select: { id: true } });
             targetUserIds = users.map(u => u.id);
         } else if (body.targetType === 'CLASS' && body.serviceClassID) {
-            const users = await db.user.findMany({ where: { serviceClassID: body.serviceClassID }, select: { id: true } });
+            const users = await db.user.findMany({ where: { service_class_id: body.serviceClassID }, select: { id: true } });
             targetUserIds = users.map(u => u.id);
         }
         try {

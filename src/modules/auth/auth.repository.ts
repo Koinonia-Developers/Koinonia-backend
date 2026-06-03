@@ -7,40 +7,29 @@ interface CreateUserData extends Omit<RegisterInput, 'password'> {
 }
 
 export class AuthRepository {
-    async createUser(data: CreateUserData): Promise<User> {
-        const { serviceClassID, password: _unused, ...rest } = data as any;
-
-        // Lookup the class to check its name for special status rules
-        const serviceClass = await db.serviceClass.findUnique({ where: { id: serviceClassID } });
-
-        let status = 'PENDING';
-        if (serviceClass) {
-            if (serviceClass.name === 'ፅሕፈት ቤት') {
-                status = 'PENDING_OFFICE_APPROVAL';
-            } else if (serviceClass.name === 'የለኝም') {
-                status = 'ACTIVE';
-            }
-        }
-
+    async createUser(data: { full_name_three_parts: string; email: string; passwordHash: string }): Promise<User> {
         return db.user.create({
             data: {
-                ...rest,
-                status,
-                serviceClass: { connect: { id: serviceClassID } },
+                full_name_three_parts: data.full_name_three_parts,
+                email: data.email,
+                password_hash: data.passwordHash,
+                system_role: 'USER',
             },
         });
     }
 
-    async findByUsername(username: string): Promise<User | null> {
-        return db.user.findUnique({ where: { username } });
+    async findByEmail(email: string): Promise<any | null> {
+        return db.user.findUnique({ 
+            where: { email },
+            include: { service_classes: true }
+        });
     }
 
-    async findByEmail(email: string): Promise<User | null> {
-        return db.user.findUnique({ where: { email } });
-    }
-
-    async findById(id: string): Promise<User | null> {
-        return db.user.findUnique({ where: { id } });
+    async findById(id: string): Promise<any | null> {
+        return db.user.findUnique({ 
+            where: { id },
+            include: { service_classes: true }
+        });
     }
 }
 

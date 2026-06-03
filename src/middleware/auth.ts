@@ -5,7 +5,7 @@ import { UnauthorizedError, ForbiddenError } from '../utils/errors';
 
 export interface JwtPayload {
     userID: string;
-    role: 'MEMBER' | 'CLASS_LEADER' | 'SUPER_ADMIN';
+    role: 'USER' | 'MEMBER' | 'TEACHER' | 'SERVICE_MANAGER' | 'SECRETARIAT_SECRETARY' | 'SECRETARIAT_VICE' | 'SECRETARIAT_CHAIRMAN' | 'SUPER_ADMIN' | 'CLASS_LEADER';
     serviceClassID: string;
     classLeaderOf?: string | null;
     status: string;
@@ -20,11 +20,18 @@ declare global {
 }
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token = req.cookies?.token;
+
+    if (!token) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.split(' ')[1];
+        }
+    }
+
+    if (!token) {
         return next(new UnauthorizedError('No token provided'));
     }
-    const token = authHeader.split(' ')[1];
     try {
         const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
         req.user = decoded;
@@ -35,10 +42,27 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     }
 };
 
-export const requireRole = (allowedRoles: Array<'MEMBER' | 'CLASS_LEADER' | 'SUPER_ADMIN'>) => {
+export const requireRole = (allowedRoles: Array<string>) => {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) return next(new UnauthorizedError('Not authenticated'));
-        if (!allowedRoles.includes(req.user.role)) {
+        
+        const userRole = req.user.role;
+
+        // SECRETARIAT_CHAIRMAN has absolute structural priority and bypass authority over all system routes
+        if (userRole === 'SECRETARIAT_CHAIRMAN' || userRole === 'SUPER_ADMIN') {
+            return next();
+        }
+
+        // Map roles for backward compatibility with the existing codebase
+        const effectiveAllowed = [...allowedRoles];
+        if (allowedRoles.includes('SUPER_ADMIN')) {
+            effectiveAllowed.push('SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY');
+        }
+        if (allowedRoles.includes('CLASS_LEADER')) {
+            effectiveAllowed.push('SERVICE_MANAGER');
+        }
+
+        if (!effectiveAllowed.includes(userRole)) {
             return next(new ForbiddenError(`Requires one of roles: ${allowedRoles.join(', ')}`));
         }
         next();
