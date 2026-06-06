@@ -37,6 +37,26 @@ export class AnnouncementsController {
             next(error);
         }
     }
+
+    async updateAnnouncement(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userRole = req.user!.role;
+            const announcement = await announcementsService.updateAnnouncement(userRole, req.params.id as string, req.body);
+            res.status(200).json(announcement);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteAnnouncement(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userRole = req.user!.role;
+            await announcementsService.deleteAnnouncement(userRole, req.params.id as string);
+            res.status(200).json({ status: 'success', message: 'Announcement deleted' });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export const announcementsController = new AnnouncementsController();

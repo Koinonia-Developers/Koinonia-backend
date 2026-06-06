@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { adminController } from './admin.controller';
 import { requireAuth, requireActiveStatus, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
-import { userIdParamSchema, suspendSchema, promoteRoleSchema, promoteLeaderSchema, changeClassSchema } from './admin.schema';
+import { userIdParamSchema, suspendSchema, promoteRoleSchema, promoteLeaderSchema, changeClassSchema, assignRoleSchema, transferChairmanSchema } from './admin.schema';
 
 const router = Router();
 const superAdmin = [requireAuth, requireActiveStatus, requireRole(['SUPER_ADMIN'])];
@@ -34,5 +34,15 @@ import { createSubClassSchema, updateSubClassRolesSchema } from './admin.schema'
 router.get('/subclasses', ...adminAccess, adminController.getSubClasses);
 router.post('/subclasses', ...adminAccess, validate(createSubClassSchema), adminController.createSubClass);
 router.patch('/subclasses/:id/roles', ...adminAccess, validate(updateSubClassRolesSchema), adminController.updateSubClassRoles);
+
+// Chairman Role Management (SECRETARIAT_CHAIRMAN only)
+const chairmanOnly = [requireAuth, requireActiveStatus, requireRole(['SECRETARIAT_CHAIRMAN', 'SUPER_ADMIN'])];
+router.post('/assign-role', ...chairmanOnly, validate(assignRoleSchema), adminController.assignRole);
+router.delete('/revoke-role/:id', ...chairmanOnly, adminController.revokeRole);
+router.post('/transfer-chairman', ...chairmanOnly, validate(transferChairmanSchema), adminController.transferChairman);
+
+// Audit Logs and Member Census (Chairman only)
+router.get('/audit-logs', ...chairmanOnly, adminController.getAuditLogs);
+router.get('/member-census', ...chairmanOnly, adminController.getMemberCensus);
 
 export default router;

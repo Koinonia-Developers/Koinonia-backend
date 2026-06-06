@@ -123,6 +123,44 @@ export class AdminController {
             res.status(200).json({ status: 'success', data: user });
         } catch (e) { next(e); }
     }
+
+    // ─── Chairman Role Management ───────────────────────────────────────
+    async assignRole(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await adminService.assignRole(req.user!.userID, req.user!, req.body, getIp(req));
+            res.status(200).json({ status: 'success', data: result });
+        } catch (e) { next(e); }
+    }
+
+    async revokeRole(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await adminService.revokeRole(req.user!.userID, req.user!, req.params.id as string, getIp(req));
+            res.status(200).json({ status: 'success', data: result });
+        } catch (e) { next(e); }
+    }
+
+    async transferChairman(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await adminService.transferChairman(req.user!.userID, req.body.targetUserId, getIp(req));
+            res.status(200).json({ status: 'success', data: result });
+        } catch (e) { next(e); }
+    }
+
+    // ─── Audit Logs ─────────────────────────────────────────────────────
+    async getAuditLogs(req: Request, res: Response, next: NextFunction) {
+        try {
+            const logs = await adminService.getAuditLogs(req.query);
+            res.status(200).json({ status: 'success', data: logs });
+        } catch (e) { next(e); }
+    }
+
+    // ─── Member Census ───────────────────────────────────────────────────
+    async getMemberCensus(req: Request, res: Response, next: NextFunction) {
+        try {
+            const census = await adminService.getMemberCensus();
+            res.status(200).json({ status: 'success', data: census });
+        } catch (e) { next(e); }
+    }
 }
 
 export const adminController = new AdminController();

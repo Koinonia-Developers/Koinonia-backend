@@ -35,4 +35,22 @@ router.post(
     announcementsController.commentOnAnnouncement
 );
 
+// PATCH /announcements/:id — SECRETARIAT_CHAIRMAN only
+router.patch(
+    '/:id',
+    requireAuth,
+    requireActiveStatus,
+    requireRole(['SECRETARIAT_CHAIRMAN', 'SUPER_ADMIN']),
+    announcementsController.updateAnnouncement
+);
+
+// DELETE /announcements/:id — SECRETARIAT_CHAIRMAN only
+router.delete(
+    '/:id',
+    requireAuth,
+    requireActiveStatus,
+    requireRole(['SECRETARIAT_CHAIRMAN', 'SUPER_ADMIN']),
+    announcementsController.deleteAnnouncement
+);
+
 export default router;

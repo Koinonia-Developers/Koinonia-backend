@@ -18,6 +18,41 @@ export class LibraryRepository {
             data: { likes: { increment: 1 } }
         });
     }
+
+    async createItem(data: {
+        title: string;
+        description: string;
+        drive_url: string;
+        category: 'SPIRITUAL' | 'ACADEMIC' | 'OTHER';
+        academic_department?: string | null;
+        academic_year?: number | null;
+        course?: string | null;
+        document_type?: 'TEXTBOOK' | 'PAST_EXAM' | null;
+    }) {
+        return db.library_items.create({
+            data
+        });
+    }
+
+    async updateItem(id: string, data: {
+        title?: string;
+        description?: string;
+        drive_url?: string;
+        category?: 'SPIRITUAL' | 'ACADEMIC' | 'OTHER';
+        academic_department?: string | null;
+        academic_year?: number | null;
+        course?: string | null;
+        document_type?: 'TEXTBOOK' | 'PAST_EXAM' | null;
+    }) {
+        return db.library_items.update({
+            where: { id },
+            data
+        });
+    }
+
+    async deleteItem(id: string) {
+        await db.library_items.delete({ where: { id } });
+    }
 }
 
 export const libraryRepository = new LibraryRepository();

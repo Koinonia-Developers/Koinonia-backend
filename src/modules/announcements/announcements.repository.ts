@@ -62,6 +62,47 @@ export class AnnouncementsRepository {
             targetClass: r.service_classes ? { name: r.service_classes.class_name_amharic } : null
         }));
     }
+
+    async findById(id: string) {
+        const result = await db.announcement.findUnique({
+            where: { id },
+            include: {
+                users: { select: { full_name_three_parts: true, system_role: true } },
+                service_classes: { select: { class_name_amharic: true } }
+            }
+        });
+        if (!result) return null;
+        return {
+            ...result,
+            author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role } : null,
+            targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null
+        };
+    }
+
+    async updateAnnouncement(id: string, data: {
+        title?: string;
+        content?: string;
+        is_public?: boolean;
+        target_class_id?: string | null;
+    }) {
+        const result = await db.announcement.update({
+            where: { id },
+            data,
+            include: {
+                users: { select: { full_name_three_parts: true, system_role: true } },
+                service_classes: { select: { class_name_amharic: true } }
+            }
+        });
+        return {
+            ...result,
+            author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role } : null,
+            targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null
+        };
+    }
+
+    async deleteAnnouncement(id: string) {
+        await db.announcement.delete({ where: { id } });
+    }
 }
 
 export const announcementsRepository = new AnnouncementsRepository();

@@ -55,3 +55,21 @@ export type ChangeClassInput = z.infer<typeof changeClassSchema>['body'];
 export type SuspendInput = z.infer<typeof suspendSchema>['body'];
 export type CreateSubClassInput = z.infer<typeof createSubClassSchema>['body'];
 export type UpdateSubClassRolesInput = z.infer<typeof updateSubClassRolesSchema>['body'];
+
+// Chairman role management schemas
+export const assignRoleSchema = z.object({
+    body: z.object({
+        targetUserId: z.string().uuid('Invalid user ID'),
+        role: z.enum(['SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SERVICE_MANAGER']),
+        serviceClassId: z.string().uuid('Invalid service class ID').optional()
+    })
+});
+
+export const transferChairmanSchema = z.object({
+    body: z.object({
+        targetUserId: z.string().uuid('Invalid user ID')
+    })
+});
+
+export type AssignRoleInput = z.infer<typeof assignRoleSchema>['body'];
+export type TransferChairmanInput = z.infer<typeof transferChairmanSchema>['body'];

@@ -224,6 +224,149 @@ export class AdminService {
         });
         return updated;
     }
+
+    // ─── Chairman Role Management ───────────────────────────────────────
+    async assignRole(adminId: string, requester: any, body: { targetUserId: string; role: string; serviceClassId?: string }, ip?: string) {
+        if (requester.role !== 'SECRETARIAT_CHAIRMAN' && requester.role !== 'SUPER_ADMIN') {
+            throw new ForbiddenError('Only Chairman can assign executive roles');
+        }
+
+        const targetUser = await adminRepository.findUserById(body.targetUserId);
+        if (!targetUser) throw new NotFoundError('Target user not found');
+
+        const validRoles = ['SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SERVICE_MANAGER'];
+        if (!validRoles.includes(body.role)) {
+            throw new BadRequestError('Invalid role for assignment');
+        }
+
+        const updateData: any = { role: body.role };
+        if (body.role === 'SERVICE_MANAGER' && body.serviceClassId) {
+            updateData.serviceClassID = body.serviceClassId;
+        }
+
+        const updated = await adminRepository.updateUser(body.targetUserId, updateData);
+
+        await adminRepository.logActivity({
+            actorID: adminId, actionType: 'ASSIGN_ROLE',
+            targetUserID: body.targetUserId,
+            description: `Assigned ${body.role} role to ${targetUser.username}`, ipAddress: ip
+        });
+
+        return updated;
+    }
+
+    async revokeRole(adminId: string, requester: any, targetUserId: string, ip?: string) {
+        if (requester.role !== 'SECRETARIAT_CHAIRMAN' && requester.role !== 'SUPER_ADMIN') {
+            throw new ForbiddenError('Only Chairman can revoke executive roles');
+        }
+
+        const targetUser = await adminRepository.findUserById(targetUserId);
+        if (!targetUser) throw new NotFoundError('Target user not found');
+
+        const updated = await adminRepository.updateUser(targetUserId, { role: 'MEMBER' });
+
+        await adminRepository.logActivity({
+            actorID: adminId, actionType: 'REVOKE_ROLE',
+            targetUserID: targetUserId,
+            description: `Revoked executive role from ${targetUser.username}`, ipAddress: ip
+        });
+
+        return updated;
+    }
+
+    async transferChairman(currentChairmanId: string, targetUserId: string, ip?: string) {
+        const currentChairman = await adminRepository.findUserById(currentChairmanId);
+        if (!currentChairman) throw new NotFoundError('Current chairman not found');
+        if (currentChairman.role !== 'SECRETARIAT_CHAIRMAN') {
+            throw new ForbiddenError('Only current Chairman can transfer chairmanship');
+        }
+
+        const targetUser = await adminRepository.findUserById(targetUserId);
+        if (!targetUser) throw new NotFoundError('Target user not found');
+
+        // Swap roles using a transaction
+        const targetPreviousRole = targetUser.role;
+
+        await db.$transaction([
+            db.user.update({
+                where: { id: currentChairmanId },
+                data: { system_role: targetPreviousRole === 'USER' ? 'MEMBER' : targetPreviousRole }
+            }),
+            db.user.update({
+                where: { id: targetUserId },
+                data: { system_role: 'SECRETARIAT_CHAIRMAN' }
+            })
+        ]);
+
+        await adminRepository.logActivity({
+            actorID: currentChairmanId, actionType: 'TRANSFER_CHAIRMAN',
+            targetUserID: targetUserId,
+            description: `Transferred chairmanship from ${currentChairman.username} to ${targetUser.username}`, ipAddress: ip
+        });
+
+        return { success: true, message: 'Chairmanship transferred successfully' };
+    }
+
+    // ─── Audit Logs ─────────────────────────────────────────────────────
+    async getAuditLogs(query: any) {
+        const { entityType, userId, limit = 50, offset = 0 } = query;
+
+        const whereClause: any = {};
+        if (entityType) whereClause.entity_type = entityType;
+        if (userId) whereClause.user_id = userId;
+
+        const logs = await db.$queryRawUnsafe(
+            `SELECT * FROM audit_logs
+            WHERE $1::text IS NULL OR entity_type = $1
+            AND $2::text IS NULL OR user_id = $2
+            ORDER BY created_at DESC
+            LIMIT $3 OFFSET $4`,
+            entityType || null,
+            userId || null,
+            parseInt(limit),
+            parseInt(offset)
+        );
+
+        return logs;
+    }
+
+    // ─── Member Census ───────────────────────────────────────────────────
+    async getMemberCensus() {
+        const users = await db.user.findMany({
+            select: {
+                id: true,
+                email: true,
+                full_name_three_parts: true,
+                system_role: true,
+                service_class_id: true,
+                phone_number: true,
+                academic_dept: true,
+                academic_year: true,
+                repentance_father_id: true,
+                spiritual_father_id: true,
+                spiritual_mother_id: true,
+                created_at: true,
+                service_classes: { select: { class_name_amharic: true } }
+            },
+            orderBy: { created_at: 'desc' }
+        });
+
+        return users.map(u => ({
+            id: u.id,
+            email: u.email,
+            fullName: u.full_name_three_parts,
+            role: u.system_role,
+            serviceClassId: u.service_class_id,
+            serviceClassName: u.service_classes?.class_name_amharic,
+            phoneNumber: u.phone_number,
+            academicDepartment: u.academic_dept,
+            academicYear: u.academic_year,
+            repentanceFatherId: u.repentance_father_id,
+            spiritualFatherId: u.spiritual_father_id,
+            spiritualMotherId: u.spiritual_mother_id,
+            createdAt: u.created_at
+        }));
+    }
 }
 
 export const adminService = new AdminService();

@@ -1,6 +1,6 @@
 import { AnnouncementsRepository, announcementsRepository } from './announcements.repository';
 import { CreateAnnouncementInput } from './announcements.schema';
-import { BadRequestError } from '../../utils/errors';
+import { BadRequestError, ForbiddenError } from '../../utils/errors';
 import { Prisma } from '@prisma/client';
 import { db } from '../../config/db';
 import { notificationsRepository } from '../notifications/notifications.repository';
@@ -58,6 +58,30 @@ export class AnnouncementsService {
 
     async getAnnouncements(userId: string, userClassID: string, userRole: string) {
         return this.repo.findAnnouncementsForUser(userClassID, userRole);
+    }
+
+    async updateAnnouncement(userRole: string, id: string, data: any) {
+        const announcement = await this.repo.findById(id);
+        if (!announcement) throw new BadRequestError('Announcement not found');
+
+        // SECRETARIAT_CHAIRMAN can edit any announcement
+        if (userRole !== 'SECRETARIAT_CHAIRMAN' && userRole !== 'SUPER_ADMIN') {
+            throw new ForbiddenError('Only Chairman can edit announcements');
+        }
+
+        return this.repo.updateAnnouncement(id, data);
+    }
+
+    async deleteAnnouncement(userRole: string, id: string) {
+        const announcement = await this.repo.findById(id);
+        if (!announcement) throw new BadRequestError('Announcement not found');
+
+        // SECRETARIAT_CHAIRMAN can delete any announcement
+        if (userRole !== 'SECRETARIAT_CHAIRMAN' && userRole !== 'SUPER_ADMIN') {
+            throw new ForbiddenError('Only Chairman can delete announcements');
+        }
+
+        return this.repo.deleteAnnouncement(id);
     }
 }
 
