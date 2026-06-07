@@ -15,24 +15,24 @@ export class AnnouncementsRepository {
         const result = await db.announcement.create({
             data,
             include: {
-                users: { select: { full_name_three_parts: true, system_role: true } },
+                users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } },
                 service_classes: { select: { class_name_amharic: true } },
                 comments: {
                     include: {
-                        users: { select: { full_name_three_parts: true, system_role: true } }
+                        users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } }
                     },
                     orderBy: { created_at: 'asc' }
                 },
                 reactions: {
                     include: {
-                        users: { select: { full_name_three_parts: true, system_role: true } }
+                        users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } }
                     }
                 }
             }
         });
         return {
             ...result,
-            author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role } : null,
+            author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role, profileImageUrl: result.users.profile_image_url } : null,
             targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null,
             reaction_counts: {
                 likes: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'LIKE').length || 0,
@@ -44,7 +44,8 @@ export class AnnouncementsRepository {
                 created_at: comment.created_at,
                 author: comment.users ? {
                     fullName: comment.users.full_name_three_parts,
-                    role: comment.users.system_role
+                    role: comment.users.system_role,
+                    profileImageUrl: comment.users.profile_image_url
                 } : null
             })) || []
         };
@@ -78,17 +79,17 @@ export class AnnouncementsRepository {
             where: whereClause,
             orderBy: { published_at: 'desc' },
             include: {
-                users: { select: { full_name_three_parts: true, system_role: true } },
+                users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } },
                 service_classes: { select: { class_name_amharic: true } },
                 comments: {
                     include: {
-                        users: { select: { full_name_three_parts: true, system_role: true } }
+                        users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } }
                     },
                     orderBy: { created_at: 'asc' }
                 },
                 reactions: {
                     include: {
-                        users: { select: { full_name_three_parts: true, system_role: true } }
+                        users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } }
                     }
                 }
             }
@@ -108,7 +109,8 @@ export class AnnouncementsRepository {
                 created_at: comment.created_at,
                 author: comment.users ? {
                     fullName: comment.users.full_name_three_parts,
-                    role: comment.users.system_role
+                    role: comment.users.system_role,
+                    profileImageUrl: comment.users.profile_image_url
                 } : null
             })) || []
         }));
@@ -118,17 +120,17 @@ export class AnnouncementsRepository {
         const result = await db.announcement.findUnique({
             where: { id },
             include: {
-                users: { select: { full_name_three_parts: true, system_role: true } },
+                users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } },
                 service_classes: { select: { class_name_amharic: true } },
                 comments: {
                     include: {
-                        users: { select: { full_name_three_parts: true, system_role: true } }
+                        users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } }
                     },
                     orderBy: { created_at: 'asc' }
                 },
                 reactions: {
                     include: {
-                        users: { select: { full_name_three_parts: true, system_role: true } }
+                        users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } }
                     }
                 }
             }
@@ -136,7 +138,7 @@ export class AnnouncementsRepository {
         if (!result) return null;
         return {
             ...result,
-            author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role } : null,
+            author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role, profileImageUrl: result.users.profile_image_url } : null,
             targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null,
             reaction_counts: {
                 likes: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'LIKE').length || 0,
@@ -148,7 +150,8 @@ export class AnnouncementsRepository {
                 created_at: comment.created_at,
                 author: comment.users ? {
                     fullName: comment.users.full_name_three_parts,
-                    role: comment.users.system_role
+                    role: comment.users.system_role,
+                    profileImageUrl: comment.users.profile_image_url
                 } : null
             })) || []
         };
@@ -164,24 +167,24 @@ export class AnnouncementsRepository {
             where: { id },
             data,
             include: {
-                users: { select: { full_name_three_parts: true, system_role: true } },
+                users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } },
                 service_classes: { select: { class_name_amharic: true } },
                 comments: {
                     include: {
-                        users: { select: { full_name_three_parts: true, system_role: true } }
+                        users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } }
                     },
                     orderBy: { created_at: 'asc' }
                 },
                 reactions: {
                     include: {
-                        users: { select: { full_name_three_parts: true, system_role: true } }
+                        users: { select: { full_name_three_parts: true, system_role: true, profile_image_url: true } }
                     }
                 }
             }
         });
         return {
             ...result,
-            author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role } : null,
+            author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role, profileImageUrl: result.users.profile_image_url } : null,
             targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null,
             reaction_counts: {
                 likes: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'LIKE').length || 0,
@@ -193,7 +196,8 @@ export class AnnouncementsRepository {
                 created_at: comment.created_at,
                 author: comment.users ? {
                     fullName: comment.users.full_name_three_parts,
-                    role: comment.users.system_role
+                    role: comment.users.system_role,
+                    profileImageUrl: comment.users.profile_image_url
                 } : null
             })) || []
         };
