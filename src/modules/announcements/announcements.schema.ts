@@ -14,9 +14,9 @@ export const createAnnouncementSchema = z.object({
         targetClassID: z.string().uuid("Invalid target Class ID").optional().nullable(),
         isPinned: z.boolean().optional().default(false),
         scheduledAt: z.string().datetime().optional().nullable(),
-        imageUrl: z.array(z.string().url("Invalid image URL")).optional().nullable(),
-        videoUrl: z.array(z.string().url("Invalid video URL")).optional().nullable(),
-        pdfUrl: z.array(z.string().url("Invalid PDF URL")).optional().nullable(),
+        imageUrl: z.array(z.string()).optional().nullable(),
+        videoUrl: z.array(z.string()).optional().nullable(),
+        pdfUrl: z.array(z.string()).optional().nullable(),
     })
 });
 
