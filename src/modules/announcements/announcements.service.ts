@@ -22,7 +22,10 @@ export class AnnouncementsService {
             content: data.content,
             is_public: data.targetType === 'ALL',
             target_class_id: data.targetType === 'CLASS' ? data.targetClassID : null,
-            author_id: adminId
+            author_id: adminId,
+            image_url: data.imageUrl || null,
+            video_url: data.videoUrl || null,
+            pdf_url: data.pdfUrl || null
         };
 
         const announcement = await this.repo.createAnnouncement(payload);

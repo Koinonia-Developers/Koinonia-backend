@@ -8,6 +8,9 @@ export class AnnouncementsRepository {
         is_public: boolean;
         target_class_id?: string | null;
         author_id: string;
+        image_url?: string | null;
+        video_url?: string | null;
+        pdf_url?: string | null;
     }) {
         const result = await db.announcement.create({
             data,
