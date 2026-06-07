@@ -10,6 +10,7 @@ export const promoteRoleSchema = z.object({
     params: z.object({ id: z.string().uuid() }),
     body: z.object({
         role: z.enum(['MEMBER', 'CLASS_LEADER', 'TEACHER', 'SERVICE_MANAGER', 'SUPER_ADMIN']),
+        serviceClassId: z.string().uuid('Invalid service class ID').optional()
     }),
 });
 
