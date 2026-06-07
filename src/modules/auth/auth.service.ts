@@ -68,6 +68,13 @@ export class AuthService {
         const { password_hash: _, ...userWithoutPassword } = user as any;
         return userWithoutPassword;
     }
+
+    async updateProfile(id: string, data: any) {
+        const user = await authRepository.updateProfile(id, data);
+        if (!user) return null;
+        const { password_hash: _, ...userWithoutPassword } = user as any;
+        return userWithoutPassword;
+    }
 }
 
 export const authService = new AuthService();

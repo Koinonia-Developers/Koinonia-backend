@@ -68,6 +68,21 @@ export class AuthController {
             next(error);
         }
     }
+
+    async updateProfile(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userID = (req as any).user?.userID;
+            if (!userID) {
+                res.status(401).json({ error: 'Unauthorized' });
+                return;
+            }
+            
+            const user = await authService.updateProfile(userID, req.body);
+            res.status(200).json({ data: user });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export const authController = new AuthController();

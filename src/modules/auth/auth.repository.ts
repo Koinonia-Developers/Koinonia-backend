@@ -43,6 +43,24 @@ export class AuthRepository {
             include: { service_classes: true }
         });
     }
+
+    async updateProfile(id: string, data: any) {
+        return db.user.update({
+            where: { id },
+            data: {
+                phone_number: data.phone_number,
+                academic_dept: data.academic_dept,
+                academic_year: data.academic_year,
+                dorm_block: data.dorm_block,
+                dorm_room: data.dorm_room,
+                sex: data.sex,
+                clerical_rank: data.clerical_rank,
+                bio: data.bio,
+                profile_image_url: data.profile_image_url,
+            },
+            include: { service_classes: true }
+        });
+    }
 }
 
 export const authRepository = new AuthRepository();
