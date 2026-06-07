@@ -72,7 +72,18 @@ export class AnnouncementsService {
             throw new ForbiddenError('Only Chairman can edit announcements');
         }
 
-        return this.repo.updateAnnouncement(id, data);
+        // Convert targetType to is_public and targetClassID to target_class_id
+        const updateData: any = {
+            title: data.title,
+            content: data.content,
+            is_public: data.targetType === 'ALL',
+            target_class_id: data.targetType === 'CLASS' ? data.targetClassID : null,
+            image_url: data.imageUrl || null,
+            video_url: data.videoUrl || null,
+            pdf_url: data.pdfUrl || null
+        };
+
+        return this.repo.updateAnnouncement(id, updateData);
     }
 
     async deleteAnnouncement(userRole: string, id: string) {
