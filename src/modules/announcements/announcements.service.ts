@@ -126,7 +126,7 @@ export class AnnouncementsService {
         }
     }
 
-    async commentOnAnnouncement(userId: string, announcementId: string, content: string) {
+    async commentOnAnnouncement(userId: string, announcementId: string, content: string, parentCommentId?: string) {
         if (!content || content.trim().length === 0) {
             throw new BadRequestError('Comment content is required');
         }
@@ -135,7 +135,8 @@ export class AnnouncementsService {
             data: {
                 announcement_id: announcementId,
                 author_id: userId,
-                content: content.trim()
+                content: content.trim(),
+                parent_comment_id: parentCommentId || null
             },
             include: {
                 users: { select: { full_name_three_parts: true, system_role: true } }

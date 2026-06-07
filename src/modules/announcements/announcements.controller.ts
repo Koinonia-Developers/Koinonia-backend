@@ -38,8 +38,8 @@ export class AnnouncementsController {
         try {
             const userId = req.user!.userID;
             const announcementId = req.params.id as string;
-            const { content } = req.body;
-            const result = await announcementsService.commentOnAnnouncement(userId, announcementId, content);
+            const { content, parentCommentId } = req.body;
+            const result = await announcementsService.commentOnAnnouncement(userId, announcementId, content, parentCommentId);
             res.status(201).json(result);
         } catch (error) {
             next(error);
