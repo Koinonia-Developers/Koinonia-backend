@@ -197,12 +197,12 @@ export class AdminService {
 
     async createSubClass(adminId: string, requester: any, body: { name: string }, ip?: string) {
         if (!requester.serviceClassID) throw new BadRequestError('You do not belong to a service class');
-        
-        const subClass = await adminRepository.createSubClass(requester.serviceClassID, body.name);
-        
+
+        const subClass = await adminRepository.createSubClass(requester.serviceClassID, body.name, 'PENDING_APPROVAL');
+
         await adminRepository.logActivity({
             actorID: adminId, actionType: 'CREATE_SUBCLASS',
-            description: `Created sub-class ${body.name}`, ipAddress: ip
+            description: `Created sub-class ${body.name} pending approval`, ipAddress: ip
         });
         return subClass;
     }
@@ -217,12 +217,42 @@ export class AdminService {
         }
 
         const updated = await adminRepository.updateSubClassRoles(subClassId, body);
-        
+
         await adminRepository.logActivity({
             actorID: adminId, actionType: 'UPDATE_SUBCLASS_ROLES',
-            description: `Updated roles for sub-class ${subClass.sub_class_name}`, ipAddress: ip
+            description: `Updated roles for sub-class ${subClass.sub_class_name} pending approval`, ipAddress: ip
         });
         return updated;
+    }
+
+    async getPendingSubClassApprovals() {
+        return adminRepository.getPendingSubClassApprovals();
+    }
+
+    async approveSubClass(adminId: string, subClassId: string, ip?: string) {
+        const subClass = await db.sub_classes.findUnique({ where: { id: subClassId } });
+        if (!subClass) throw new NotFoundError('Sub-class not found');
+
+        await adminRepository.approveSubClass(subClassId);
+
+        await adminRepository.logActivity({
+            actorID: adminId, actionType: 'APPROVE_SUBCLASS',
+            description: `Approved sub-class ${subClass.sub_class_name}`, ipAddress: ip
+        });
+        return { success: true };
+    }
+
+    async rejectSubClass(adminId: string, subClassId: string, ip?: string) {
+        const subClass = await db.sub_classes.findUnique({ where: { id: subClassId } });
+        if (!subClass) throw new NotFoundError('Sub-class not found');
+
+        await adminRepository.rejectSubClass(subClassId);
+
+        await adminRepository.logActivity({
+            actorID: adminId, actionType: 'REJECT_SUBCLASS',
+            description: `Rejected sub-class ${subClass.sub_class_name}`, ipAddress: ip
+        });
+        return { success: true };
     }
 
     // ─── Office (ፅሕፈት ቤት) ──────────────────────────────────────────

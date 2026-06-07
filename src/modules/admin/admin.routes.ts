@@ -35,6 +35,11 @@ router.get('/subclasses', ...adminAccess, adminController.getSubClasses);
 router.post('/subclasses', ...adminAccess, validate(createSubClassSchema), adminController.createSubClass);
 router.patch('/subclasses/:id/roles', ...adminAccess, validate(updateSubClassRolesSchema), adminController.updateSubClassRoles);
 
+// Sub-Class Approvals (Chairman only)
+router.get('/subclasses/pending-approvals', ...chairmanOnly, adminController.getPendingSubClassApprovals);
+router.patch('/subclasses/:id/approve', ...chairmanOnly, adminController.approveSubClass);
+router.patch('/subclasses/:id/reject', ...chairmanOnly, adminController.rejectSubClass);
+
 // Chairman Role Management (SECRETARIAT_CHAIRMAN only)
 const chairmanOnly = [requireAuth, requireActiveStatus, requireRole(['SECRETARIAT_CHAIRMAN', 'SUPER_ADMIN'])];
 router.post('/assign-role', ...chairmanOnly, validate(assignRoleSchema), adminController.assignRole);

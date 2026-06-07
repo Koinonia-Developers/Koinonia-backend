@@ -146,6 +146,28 @@ export class AdminController {
         } catch (e) { next(e); }
     }
 
+    // ─── Sub-Class Approvals ─────────────────────────────────────────────
+    async getPendingSubClassApprovals(req: Request, res: Response, next: NextFunction) {
+        try {
+            const approvals = await adminService.getPendingSubClassApprovals();
+            res.status(200).json({ status: 'success', data: approvals });
+        } catch (e) { next(e); }
+    }
+
+    async approveSubClass(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await adminService.approveSubClass(req.user!.userID, req.params.id as string, getIp(req));
+            res.status(200).json({ status: 'success', data: result });
+        } catch (e) { next(e); }
+    }
+
+    async rejectSubClass(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await adminService.rejectSubClass(req.user!.userID, req.params.id as string, getIp(req));
+            res.status(200).json({ status: 'success', data: result });
+        } catch (e) { next(e); }
+    }
+
     // ─── Audit Logs ─────────────────────────────────────────────────────
     async getAuditLogs(req: Request, res: Response, next: NextFunction) {
         try {

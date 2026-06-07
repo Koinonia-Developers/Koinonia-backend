@@ -166,11 +166,12 @@ export class AdminRepository {
         });
     }
 
-    async createSubClass(classId: string, name: string) {
+    async createSubClass(classId: string, name: string, status: string = 'PENDING_APPROVAL') {
         return db.sub_classes.create({
             data: {
                 parent_class_id: classId,
-                sub_class_name: name
+                sub_class_name: name,
+                status: status as any
             }
         });
     }
@@ -178,7 +179,34 @@ export class AdminRepository {
     async updateSubClassRoles(subClassId: string, roles: { sub_chair_id?: string | null, sub_vice_id?: string | null, sub_secretary_id?: string | null }) {
         return db.sub_classes.update({
             where: { id: subClassId },
-            data: roles
+            data: { ...roles, status: 'PENDING_APPROVAL' as any }
+        });
+    }
+
+    async getPendingSubClassApprovals() {
+        return db.sub_classes.findMany({
+            where: { status: 'PENDING_APPROVAL' as any },
+            include: {
+                service_classes: { select: { class_name_amharic: true } },
+                users_sub_classes_sub_chair_idTousers: { select: { id: true, full_name_three_parts: true } },
+                users_sub_classes_sub_vice_idTousers: { select: { id: true, full_name_three_parts: true } },
+                users_sub_classes_sub_secretary_idTousers: { select: { id: true, full_name_three_parts: true } }
+            },
+            orderBy: { created_at: 'desc' }
+        });
+    }
+
+    async approveSubClass(subClassId: string) {
+        return db.sub_classes.update({
+            where: { id: subClassId },
+            data: { status: 'APPROVED' as any }
+        });
+    }
+
+    async rejectSubClass(subClassId: string) {
+        return db.sub_classes.update({
+            where: { id: subClassId },
+            data: { status: 'REJECTED' as any }
         });
     }
 

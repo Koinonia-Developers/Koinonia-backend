@@ -253,12 +253,19 @@ model sub_classes {
   sub_chair_id                              String?      @db.Uuid
   sub_vice_id                               String?      @db.Uuid
   sub_secretary_id                          String?      @db.Uuid
+  status                                    sub_class_status @default(PENDING_APPROVAL)
   created_at                                DateTime     @default(now()) @db.Timestamptz(6)
   updated_at                                DateTime     @default(now()) @db.Timestamptz(6)
   service_classes                           ServiceClass @relation(fields: [parent_class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users_sub_classes_sub_chair_idTousers     User?        @relation("sub_classes_sub_chair_idTousers", fields: [sub_chair_id], references: [id], onUpdate: NoAction)
   users_sub_classes_sub_secretary_idTousers User?        @relation("sub_classes_sub_secretary_idTousers", fields: [sub_secretary_id], references: [id], onUpdate: NoAction)
   users_sub_classes_sub_vice_idTousers      User?        @relation("sub_classes_sub_vice_idTousers", fields: [sub_vice_id], references: [id], onUpdate: NoAction)
+}
+
+enum sub_class_status {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
 }
 
 enum batch_status {
