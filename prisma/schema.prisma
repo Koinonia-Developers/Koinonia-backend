@@ -21,6 +21,8 @@ model User {
   phone_number                                            String?              @db.VarChar(20)
   profile_image_url                                       String?              @default("/assets/avatar.png") @db.VarChar(255)
   bio                                                     String?
+  sex                                                     Sex?
+  clerical_rank                                           ClericalRank         @default(NONE)
   system_role                                             system_role          @default(USER)
   service_class_id                                        String?              @db.Uuid
   pending_class_id                                        String?              @db.Uuid
@@ -296,10 +298,24 @@ enum submission_status {
   PUBLISHED
 }
 
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum ClericalRank {
+  NONE
+  DEACON
+  PRIEST
+  LECTOR
+  OTHER
+}
+
 enum system_role {
   USER
   MEMBER
   TEACHER
+  CLASS_LEADER
   SERVICE_MANAGER
   SECRETARIAT_SECRETARY
   SECRETARIAT_VICE

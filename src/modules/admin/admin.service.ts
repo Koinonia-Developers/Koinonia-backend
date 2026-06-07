@@ -63,25 +63,74 @@ export class AdminService {
         if (!user) throw new NotFoundError('User not found');
         if (user.id === adminId) throw new BadRequestError('Cannot change your own role');
 
-        // Education Manager Domain Lock
-        if (body.role === 'TEACHER') {
-            if (requester.role === 'SERVICE_MANAGER') {
+        const requesterRole = requester.system_role || requester.role;
+        const targetRole = body.role;
+
+        // Permission checks based on role hierarchy
+        const canAssignSecretariatRoles = ['SECRETARIAT_CHAIRMAN', 'SUPER_ADMIN'].includes(requesterRole);
+        const canAssignServiceManager = ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SUPER_ADMIN'].includes(requesterRole);
+        const canAssignTeacher = ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SERVICE_MANAGER', 'SUPER_ADMIN'].includes(requesterRole);
+
+        // Secretariat roles can only be assigned by Chairman or Super Admin
+        if (['SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY'].includes(targetRole) && !canAssignSecretariatRoles) {
+            throw new ForbiddenError('Only the Secretariat Chairman can assign Secretariat roles');
+        }
+
+        // Service Manager can only be assigned by Chairman, Vice Chairman, or Super Admin
+        if (targetRole === 'SERVICE_MANAGER' && !canAssignServiceManager) {
+            throw new ForbiddenError('Only the Secretariat Chairman or Vice Chairman can assign Service Manager roles');
+        }
+
+        // Teacher role assignment with Education Manager domain lock
+        if (targetRole === 'TEACHER') {
+            if (!canAssignTeacher) {
+                throw new ForbiddenError('You do not have permission to assign TEACHER roles');
+            }
+            if (requesterRole === 'SERVICE_MANAGER') {
                 const requesterClass = await db.serviceClass.findUnique({ where: { id: requester.serviceClassID } });
-                if (requesterClass?.class_name_amharic !== 'ትምህርት ክፍል') {
+                if (requesterClass?.class_name_amharic !== 'ትምርት ክፍል') {
                     throw new ForbiddenError('Only the Education Manager can grant TEACHER roles');
                 }
             }
-        } else if (requester.role === 'SERVICE_MANAGER') {
-            throw new ForbiddenError('Service Managers cannot arbitrarily change system roles');
         }
 
-        const updated = await adminRepository.updateUser(targetId, { role: body.role });
-        await adminRepository.logActivity({
-            actorID: adminId, actionType: 'PROMOTE_ROLE',
-            targetUserID: targetId,
-            description: `Changed ${user.username} role to ${body.role}`, ipAddress: ip
-        });
-        return updated;
+        // Service Managers cannot arbitrarily change system roles (except for CLASS_LEADER within their class)
+        if (requesterRole === 'SERVICE_MANAGER' && 
+            !['CLASS_LEADER', 'TEACHER'].includes(targetRole) &&
+            !canAssignSecretariatRoles) {
+            throw new ForbiddenError('Service Managers can only assign CLASS_LEADER or TEACHER roles');
+        }
+
+        // Business rule: SERVICE_MANAGER must be assigned to a specific class
+        if (targetRole === 'SERVICE_MANAGER' && !body.serviceClassId) {
+            throw new BadRequestError('Service Manager role requires a service class assignment');
+        }
+
+        // Business rule: User must be a MEMBER to be promoted to CLASS_LEADER
+        if (targetRole === 'CLASS_LEADER' && user.role !== 'MEMBER') {
+            throw new BadRequestError('User must be a MEMBER before being assigned CLASS_LEADER role');
+        }
+
+        try {
+            const updateData: any = { system_role: targetRole };
+            if (targetRole === 'SERVICE_MANAGER' && body.serviceClassId) {
+                updateData.service_class_id = body.serviceClassId;
+            }
+
+            const updated = await adminRepository.updateUser(targetId, updateData);
+            await adminRepository.logActivity({
+                actorID: adminId, actionType: 'PROMOTE_ROLE',
+                targetUserID: targetId,
+                description: `Changed ${user.username} role to ${targetRole}`, ipAddress: ip
+            });
+            return updated;
+        } catch (error: any) {
+            console.error('Error promoting role:', error);
+            if (error.code === 'P2005') {
+                throw new BadRequestError(`Invalid role value: ${targetRole}. Please ensure the role is valid.`);
+            }
+            throw error;
+        }
     }
 
     async changeUserClass(adminId: string, targetId: string, body: ChangeClassInput, ip?: string) {
@@ -284,17 +333,24 @@ export class AdminService {
         const targetUser = await adminRepository.findUserById(targetUserId);
         if (!targetUser) throw new NotFoundError('Target user not found');
 
-        // Swap roles using a transaction
-        const targetPreviousRole = targetUser.role;
-
+        // Transfer chairmanship: 
+        // - Current chairman reverts to their previous role (if stored) or becomes USER
+        // - New chairman becomes SECRETARIAT_CHAIRMAN, preserving their service_class_id if they had one
         await db.$transaction([
             db.user.update({
                 where: { id: currentChairmanId },
-                data: { system_role: targetPreviousRole === 'USER' ? 'MEMBER' : targetPreviousRole }
+                data: { 
+                    system_role: 'USER',
+                    service_class_id: null
+                }
             }),
             db.user.update({
                 where: { id: targetUserId },
-                data: { system_role: 'SECRETARIAT_CHAIRMAN' }
+                data: { 
+                    system_role: 'SECRETARIAT_CHAIRMAN',
+                    // Preserve service_class_id if target was a SERVICE_MANAGER
+                    service_class_id: targetUser.serviceClassID
+                }
             })
         ]);
 
@@ -318,7 +374,7 @@ export class AdminService {
         const logs = await db.$queryRawUnsafe(
             `SELECT * FROM audit_logs
             WHERE $1::text IS NULL OR entity_type = $1
-            AND $2::text IS NULL OR user_id = $2
+            AND $2::uuid IS NULL OR user_id = $2::uuid
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4`,
             entityType || null,
@@ -342,6 +398,11 @@ export class AdminService {
                 phone_number: true,
                 academic_dept: true,
                 academic_year: true,
+                dorm_block: true,
+                dorm_room: true,
+                sex: true,
+                clerical_rank: true,
+                profile_image_url: true,
                 repentance_father_id: true,
                 spiritual_father_id: true,
                 spiritual_mother_id: true,
@@ -361,6 +422,11 @@ export class AdminService {
             phoneNumber: u.phone_number,
             academicDepartment: u.academic_dept,
             academicYear: u.academic_year,
+            dormBlock: u.dorm_block,
+            dormRoom: u.dorm_room,
+            sex: u.sex,
+            clericalRank: u.clerical_rank,
+            profileImage: u.profile_image_url,
             repentanceFatherId: u.repentance_father_id,
             spiritualFatherId: u.spiritual_father_id,
             spiritualMotherId: u.spiritual_mother_id,

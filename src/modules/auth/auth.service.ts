@@ -34,6 +34,10 @@ export class AuthService {
             full_name_three_parts: data.full_name_three_parts,
             email: data.email,
             passwordHash,
+            sex: data.sex,
+            clerical_rank: data.clerical_rank || 'NONE',
+            phone_number: data.phone_number,
+            profile_image_url: data.profile_image_url,
         });
 
         const token = generateToken(user);
@@ -43,10 +47,13 @@ export class AuthService {
     }
 
     async login(data: LoginInput) {
+        console.log('Login attempt with email:', data.email);
         const user = await authRepository.findByEmail(data.email);
+        console.log('User found:', !!user, user?.email);
         if (!user) throw new UnauthorizedError('Invalid email or password');
 
         const isPasswordValid = await bcrypt.compare(data.password, user.password_hash);
+        console.log('Password valid:', isPasswordValid);
         if (!isPasswordValid) throw new UnauthorizedError('Invalid email or password');
 
         const token = generateToken(user);

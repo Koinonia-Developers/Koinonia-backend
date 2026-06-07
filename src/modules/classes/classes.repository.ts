@@ -12,7 +12,7 @@ export class ClassesRepository {
         });
         return classes.map(c => ({
             id: c.id,
-            name: c.class_name_amharic
+            class_name_amharic: c.class_name_amharic
         }));
     }
 }

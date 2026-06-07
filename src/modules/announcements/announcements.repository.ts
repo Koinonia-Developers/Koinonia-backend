@@ -13,13 +13,37 @@ export class AnnouncementsRepository {
             data,
             include: {
                 users: { select: { full_name_three_parts: true, system_role: true } },
-                service_classes: { select: { class_name_amharic: true } }
+                service_classes: { select: { class_name_amharic: true } },
+                comments: {
+                    include: {
+                        users: { select: { full_name_three_parts: true, system_role: true } }
+                    },
+                    orderBy: { created_at: 'asc' }
+                },
+                reactions: {
+                    include: {
+                        users: { select: { full_name_three_parts: true, system_role: true } }
+                    }
+                }
             }
         });
         return {
             ...result,
             author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role } : null,
-            targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null
+            targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null,
+            reaction_counts: {
+                likes: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'LIKE').length || 0,
+                stars: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'STAR').length || 0
+            },
+            comments: result.comments?.map((comment: any) => ({
+                id: comment.id,
+                content: comment.content,
+                created_at: comment.created_at,
+                author: comment.users ? {
+                    fullName: comment.users.full_name_three_parts,
+                    role: comment.users.system_role
+                } : null
+            })) || []
         };
     }
 
@@ -52,14 +76,38 @@ export class AnnouncementsRepository {
             orderBy: { published_at: 'desc' },
             include: {
                 users: { select: { full_name_three_parts: true, system_role: true } },
-                service_classes: { select: { class_name_amharic: true } }
+                service_classes: { select: { class_name_amharic: true } },
+                comments: {
+                    include: {
+                        users: { select: { full_name_three_parts: true, system_role: true } }
+                    },
+                    orderBy: { created_at: 'asc' }
+                },
+                reactions: {
+                    include: {
+                        users: { select: { full_name_three_parts: true, system_role: true } }
+                    }
+                }
             }
         });
 
         return results.map(r => ({
             ...r,
             author: r.users ? { fullName: r.users.full_name_three_parts, role: r.users.system_role } : null,
-            targetClass: r.service_classes ? { name: r.service_classes.class_name_amharic } : null
+            targetClass: r.service_classes ? { name: r.service_classes.class_name_amharic } : null,
+            reaction_counts: {
+                likes: r.reactions?.filter((reaction: any) => reaction.reaction_type === 'LIKE').length || 0,
+                stars: r.reactions?.filter((reaction: any) => reaction.reaction_type === 'STAR').length || 0
+            },
+            comments: r.comments?.map((comment: any) => ({
+                id: comment.id,
+                content: comment.content,
+                created_at: comment.created_at,
+                author: comment.users ? {
+                    fullName: comment.users.full_name_three_parts,
+                    role: comment.users.system_role
+                } : null
+            })) || []
         }));
     }
 
@@ -68,14 +116,38 @@ export class AnnouncementsRepository {
             where: { id },
             include: {
                 users: { select: { full_name_three_parts: true, system_role: true } },
-                service_classes: { select: { class_name_amharic: true } }
+                service_classes: { select: { class_name_amharic: true } },
+                comments: {
+                    include: {
+                        users: { select: { full_name_three_parts: true, system_role: true } }
+                    },
+                    orderBy: { created_at: 'asc' }
+                },
+                reactions: {
+                    include: {
+                        users: { select: { full_name_three_parts: true, system_role: true } }
+                    }
+                }
             }
         });
         if (!result) return null;
         return {
             ...result,
             author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role } : null,
-            targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null
+            targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null,
+            reaction_counts: {
+                likes: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'LIKE').length || 0,
+                stars: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'STAR').length || 0
+            },
+            comments: result.comments?.map((comment: any) => ({
+                id: comment.id,
+                content: comment.content,
+                created_at: comment.created_at,
+                author: comment.users ? {
+                    fullName: comment.users.full_name_three_parts,
+                    role: comment.users.system_role
+                } : null
+            })) || []
         };
     }
 
@@ -90,13 +162,37 @@ export class AnnouncementsRepository {
             data,
             include: {
                 users: { select: { full_name_three_parts: true, system_role: true } },
-                service_classes: { select: { class_name_amharic: true } }
+                service_classes: { select: { class_name_amharic: true } },
+                comments: {
+                    include: {
+                        users: { select: { full_name_three_parts: true, system_role: true } }
+                    },
+                    orderBy: { created_at: 'asc' }
+                },
+                reactions: {
+                    include: {
+                        users: { select: { full_name_three_parts: true, system_role: true } }
+                    }
+                }
             }
         });
         return {
             ...result,
             author: result.users ? { fullName: result.users.full_name_three_parts, role: result.users.system_role } : null,
-            targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null
+            targetClass: result.service_classes ? { name: result.service_classes.class_name_amharic } : null,
+            reaction_counts: {
+                likes: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'LIKE').length || 0,
+                stars: result.reactions?.filter((reaction: any) => reaction.reaction_type === 'STAR').length || 0
+            },
+            comments: result.comments?.map((comment: any) => ({
+                id: comment.id,
+                content: comment.content,
+                created_at: comment.created_at,
+                author: comment.users ? {
+                    fullName: comment.users.full_name_three_parts,
+                    role: comment.users.system_role
+                } : null
+            })) || []
         };
     }
 

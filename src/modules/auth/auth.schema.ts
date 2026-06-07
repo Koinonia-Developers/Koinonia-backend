@@ -5,6 +5,10 @@ export const registerSchema = z.object({
         full_name_three_parts: z.string().min(2, "Full Name is required"),
         email: z.string().email("Invalid email address"),
         password: z.string().min(6, "Password must be at least 6 characters"),
+        sex: z.enum(["MALE", "FEMALE"]).optional(),
+        clerical_rank: z.enum(["NONE", "DEACON", "PRIEST", "LECTOR", "OTHER"]).optional(),
+        phone_number: z.string().optional(),
+        profile_image_url: z.string().optional(),
     })
 });
 
