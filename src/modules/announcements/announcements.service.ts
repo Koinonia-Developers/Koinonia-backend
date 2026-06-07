@@ -83,6 +83,70 @@ export class AnnouncementsService {
 
         return this.repo.deleteAnnouncement(id);
     }
+
+    async reactToAnnouncement(userId: string, announcementId: string, reactionType: string) {
+        // Check if user already reacted
+        const existingReaction = await db.reactions.findUnique({
+            where: {
+                announcement_id_user_id: {
+                    announcement_id: announcementId,
+                    user_id: userId
+                }
+            }
+        });
+
+        if (existingReaction) {
+            // If same reaction type, remove it (toggle off)
+            if (existingReaction.reaction_type === reactionType) {
+                await db.reactions.delete({
+                    where: { id: existingReaction.id }
+                });
+                return { message: 'Reaction removed' };
+            } else {
+                // If different reaction type, update it
+                await db.reactions.update({
+                    where: { id: existingReaction.id },
+                    data: { reaction_type: reactionType as any }
+                });
+                return { message: 'Reaction updated' };
+            }
+        } else {
+            // Create new reaction
+            await db.reactions.create({
+                data: {
+                    announcement_id: announcementId,
+                    user_id: userId,
+                    reaction_type: reactionType as any
+                }
+            });
+            return { message: 'Reaction added' };
+        }
+    }
+
+    async commentOnAnnouncement(userId: string, announcementId: string, content: string) {
+        if (!content || content.trim().length === 0) {
+            throw new BadRequestError('Comment content is required');
+        }
+
+        const comment = await db.comment.create({
+            data: {
+                announcement_id: announcementId,
+                author_id: userId,
+                content: content.trim()
+            },
+            include: {
+                users: { select: { full_name_three_parts: true, system_role: true } }
+            }
+        });
+
+        return {
+            ...comment,
+            author: comment.users ? {
+                fullName: comment.users.full_name_three_parts,
+                role: comment.users.system_role
+            } : null
+        };
+    }
 }
 
 export const announcementsService = new AnnouncementsService();

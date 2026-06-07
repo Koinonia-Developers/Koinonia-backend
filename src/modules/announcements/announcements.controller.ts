@@ -24,7 +24,11 @@ export class AnnouncementsController {
 
     async reactToAnnouncement(req: Request, res: Response, next: NextFunction) {
         try {
-            res.status(200).json({ message: "Reaction recorded" });
+            const userId = req.user!.userID;
+            const announcementId = req.params.id as string;
+            const { type } = req.body;
+            const result = await announcementsService.reactToAnnouncement(userId, announcementId, type);
+            res.status(200).json(result);
         } catch (error) {
             next(error);
         }
@@ -32,7 +36,11 @@ export class AnnouncementsController {
 
     async commentOnAnnouncement(req: Request, res: Response, next: NextFunction) {
         try {
-            res.status(201).json({ message: "Comment added" });
+            const userId = req.user!.userID;
+            const announcementId = req.params.id as string;
+            const { content } = req.body;
+            const result = await announcementsService.commentOnAnnouncement(userId, announcementId, content);
+            res.status(201).json(result);
         } catch (error) {
             next(error);
         }

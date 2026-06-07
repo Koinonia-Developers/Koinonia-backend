@@ -9,12 +9,12 @@ const router = Router();
 // GET /announcements — requires auth (any active user can read)
 router.get('/', requireAuth, requireActiveStatus, announcementsController.getAnnouncements);
 
-// POST /announcements — SUPER_ADMIN only
+// POST /announcements — Secretariats only
 router.post(
     '/',
     requireAuth,
     requireActiveStatus,
-    requireRole(['SUPER_ADMIN', 'CLASS_LEADER']),
+    requireRole(['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SUPER_ADMIN']),
     validate(createAnnouncementSchema),
     announcementsController.createAnnouncement
 );
