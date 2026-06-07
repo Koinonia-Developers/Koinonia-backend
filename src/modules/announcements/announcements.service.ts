@@ -23,9 +23,9 @@ export class AnnouncementsService {
             is_public: data.targetType === 'ALL',
             target_class_id: data.targetType === 'CLASS' ? data.targetClassID : null,
             author_id: adminId,
-            image_url: data.imageUrl || null,
-            video_url: data.videoUrl || null,
-            pdf_url: data.pdfUrl || null
+            image_url: Array.isArray(data.imageUrl) ? JSON.stringify(data.imageUrl) : (data.imageUrl || null),
+            video_url: Array.isArray(data.videoUrl) ? JSON.stringify(data.videoUrl) : (data.videoUrl || null),
+            pdf_url: Array.isArray(data.pdfUrl) ? JSON.stringify(data.pdfUrl) : (data.pdfUrl || null)
         };
 
         const announcement = await this.repo.createAnnouncement(payload);
@@ -78,9 +78,9 @@ export class AnnouncementsService {
             content: data.content,
             is_public: data.targetType === 'ALL',
             target_class_id: data.targetType === 'CLASS' ? data.targetClassID : null,
-            image_url: data.imageUrl || null,
-            video_url: data.videoUrl || null,
-            pdf_url: data.pdfUrl || null
+            image_url: Array.isArray(data.imageUrl) || Array.isArray(data.image_url) ? JSON.stringify(data.imageUrl || data.image_url || []) : (data.imageUrl || data.image_url || null),
+            video_url: Array.isArray(data.videoUrl) || Array.isArray(data.video_url) ? JSON.stringify(data.videoUrl || data.video_url || []) : (data.videoUrl || data.video_url || null),
+            pdf_url: Array.isArray(data.pdfUrl) || Array.isArray(data.pdf_url) ? JSON.stringify(data.pdfUrl || data.pdf_url || []) : (data.pdfUrl || data.pdf_url || null)
         };
 
         return this.repo.updateAnnouncement(id, updateData);
