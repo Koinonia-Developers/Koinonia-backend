@@ -267,7 +267,9 @@ export class MembershipService {
                 user_id: targetUserId,
                 title: 'Membership Approved ✓',
                 message: 'Congratulations! Your membership application has been approved by the Member Affairs manager. Your class assignment will be confirmed shortly.',
-                target_route: '/dashboard/profile'
+                target_route: '/dashboard/membership/status?approved=true',
+                type: 'MEMBERSHIP',
+                related_entity_id: targetUserId
             }
         });
 
@@ -301,7 +303,9 @@ export class MembershipService {
                 message: reason
                     ? `Your membership application was not approved. Reason: ${reason}`
                     : 'Your membership application was reviewed and was not approved at this time. Please contact the Member Affairs office for more details.',
-                target_route: '/dashboard'
+                target_route: '/dashboard/membership/status?rejected=true',
+                type: 'MEMBERSHIP',
+                related_entity_id: targetUserId
             }
         });
     }

@@ -15,6 +15,7 @@ import notificationsRoutes from './modules/notifications/notifications.routes';
 import messagesRoutes from './modules/messages/messages.routes';
 import libraryRoutes from './modules/library/library.routes';
 import membershipRoutes from './modules/membership/membership.routes';
+import lmsRoutes from './modules/lms/lms.routes';
 
 const app: Application = express();
 
@@ -50,6 +51,7 @@ app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/messages', messagesRoutes);
 app.use('/api/v1/library', libraryRoutes);
 app.use('/api/v1/membership', membershipRoutes);
+app.use('/api/v1/lms', lmsRoutes);
 
 // ─── Health Check ───────────────────────────────────────────────────
 app.get('/health', (_req, res) => {

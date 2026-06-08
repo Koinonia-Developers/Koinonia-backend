@@ -123,6 +123,19 @@ export class AdminService {
                 targetUserID: targetId,
                 description: `Changed ${user.username} role to ${targetRole}`, ipAddress: ip
             });
+
+            // Notify user about role assignment
+            await db.notification.create({
+                data: {
+                    user_id: targetId,
+                    title: `Role Updated: ${targetRole}`,
+                    message: `Your role has been updated to ${targetRole}.`,
+                    target_route: '/dashboard/agent/roles',
+                    type: 'ROLE',
+                    related_entity_id: targetId
+                }
+            });
+
             return updated;
         } catch (error: any) {
             console.error('Error promoting role:', error);

@@ -49,7 +49,9 @@ export class PostsService {
                 actorID: user.userID,
                 type: 'POST',
                 content: `New post: ${post.title}`,
-                linkTarget: `/dashboard/posts#${post.id}`
+                linkTarget: `/dashboard/posts#${post.id}`,
+                notificationType: 'POST',
+                relatedEntityId: post.id
             });
         } catch (e: any) {
             console.error('Failed to spawn post notifications:', e);
@@ -122,14 +124,18 @@ export class PostsService {
                 await notificationsRepository.spawnNotification({
                     userID: parentComment.userID, actorID: user.userID,
                     type: 'REPLY', content: `Replied to your comment`,
-                    linkTarget: `/dashboard/posts#${post.id}`
+                    linkTarget: `/dashboard/posts#${post.id}`,
+                    notificationType: 'REPLY',
+                    relatedEntityId: post.id
                 });
             }
         } else if (post.authorID !== user.userID) {
             await notificationsRepository.spawnNotification({
                 userID: post.authorID, actorID: user.userID,
                 type: 'REPLY', content: `Commented on your post`,
-                linkTarget: `/dashboard/posts#${post.id}`
+                linkTarget: `/dashboard/posts#${post.id}`,
+                notificationType: 'REPLY',
+                relatedEntityId: post.id
             });
         }
 

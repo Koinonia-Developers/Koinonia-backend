@@ -53,7 +53,9 @@ export class AnnouncementsService {
             actorID: adminId,
             type: 'ANNOUNCEMENT',
             content: `New announcement: ${announcement.title}`,
-            linkTarget: `/dashboard/announcements`
+            linkTarget: `/dashboard/announcements/${announcement.id}`,
+            notificationType: 'ANNOUNCEMENT',
+            relatedEntityId: announcement.id
         });
 
         return announcement;
