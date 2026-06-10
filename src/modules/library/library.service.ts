@@ -1,8 +1,8 @@
 import { libraryRepository } from './library.repository';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
 
-// Google Drive URL validation regex
-const GOOGLE_DRIVE_URL_PATTERN = /^https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+\/view/;
+// Google Drive URL validation regex - accept /view, /preview, and open?id=FILE_ID forms
+const GOOGLE_DRIVE_URL_PATTERN = /^(?:https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)\/(?:view|preview)(?:.*)?|https:\/\/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+))(?:.*)?$/;
 
 export class LibraryService {
     async listAll() {
@@ -76,6 +76,13 @@ export class LibraryService {
         return GOOGLE_DRIVE_URL_PATTERN.test(url);
     }
 
+    // Extract drive file id from known Drive URL formats
+    private extractDriveFileId(url: string): string | null {
+        const m = url.match(GOOGLE_DRIVE_URL_PATTERN);
+        if (!m) return null;
+        return m[1] || m[2] || null;
+    }
+
     // FR-LIB-01: Reject direct binary file uploads
     private validateNoDirectFileUpload(data: any): void {
         if (data.file || data.binary || data.upload) {
@@ -100,9 +107,16 @@ export class LibraryService {
     }
 
     async createItem(userRole: string, data: any) {
-        // Only SECRETARIAT_CHAIRMAN, SUPER_ADMIN, and SERVICE_MANAGER can create library items
-        if (userRole !== 'SECRETARIAT_CHAIRMAN' && userRole !== 'SUPER_ADMIN' && userRole !== 'SERVICE_MANAGER') {
-            throw new ForbiddenError('Only administrators can create library items');
+        // FR-LIB-07: Only specific secretariat roles and education manager can create library items
+        const allowedRoles = [
+            'SECRETARIAT_CHAIRMAN',
+            'SECRETARIAT_VICE',
+            'SECRETARIAT_SECRETARY',
+            'EDUCATION_CLASS_MANAGER'
+        ];
+
+        if (!allowedRoles.includes(userRole)) {
+            throw new ForbiddenError('Insufficient permissions to create library items');
         }
 
         // FR-LIB-01: Validate no direct file uploads
@@ -113,6 +127,12 @@ export class LibraryService {
             throw new BadRequestError(
                 'Only public Google Drive URLs are accepted. Format: https://drive.google.com/file/d/{FILE_ID}/view'
             );
+        }
+
+        // Validate category
+        const allowedCategories = ['SPIRITUAL', 'ACADEMIC', 'OTHER'];
+        if (!data.category || !allowedCategories.includes(data.category)) {
+            throw new BadRequestError('Invalid or missing category. Must be one of SPIRITUAL, ACADEMIC, OTHER');
         }
 
         const itemData = {
@@ -133,9 +153,16 @@ export class LibraryService {
         const item = await libraryRepository.findById(id);
         if (!item) throw new NotFoundError('Library item not found');
 
-        // Only SECRETARIAT_CHAIRMAN, SUPER_ADMIN, and SERVICE_MANAGER can edit
-        if (userRole !== 'SECRETARIAT_CHAIRMAN' && userRole !== 'SUPER_ADMIN' && userRole !== 'SERVICE_MANAGER') {
-            throw new ForbiddenError('Only administrators can edit library items');
+        // FR-LIB-07: Only specific secretariat roles and education manager can edit
+        const allowedRoles = [
+            'SECRETARIAT_CHAIRMAN',
+            'SECRETARIAT_VICE',
+            'SECRETARIAT_SECRETARY',
+            'EDUCATION_CLASS_MANAGER'
+        ];
+
+        if (!allowedRoles.includes(userRole)) {
+            throw new ForbiddenError('Insufficient permissions to edit library items');
         }
 
         // FR-LIB-01: Validate no direct file uploads
@@ -165,9 +192,16 @@ export class LibraryService {
         const item = await libraryRepository.findById(id);
         if (!item) throw new NotFoundError('Library item not found');
 
-        // Only SECRETARIAT_CHAIRMAN, SUPER_ADMIN, and SERVICE_MANAGER can delete
-        if (userRole !== 'SECRETARIAT_CHAIRMAN' && userRole !== 'SUPER_ADMIN' && userRole !== 'SERVICE_MANAGER') {
-            throw new ForbiddenError('Only administrators can delete library items');
+        // FR-LIB-07: Only specific secretariat roles and education manager can delete
+        const allowedRolesDelete = [
+            'SECRETARIAT_CHAIRMAN',
+            'SECRETARIAT_VICE',
+            'SECRETARIAT_SECRETARY',
+            'EDUCATION_CLASS_MANAGER'
+        ];
+
+        if (!allowedRolesDelete.includes(userRole)) {
+            throw new ForbiddenError('Insufficient permissions to delete library items');
         }
 
         return libraryRepository.deleteItem(id);
