@@ -186,6 +186,8 @@ model library_items {
   title               String           @db.VarChar(200)
   description         String?
   drive_url           String           @db.VarChar(500)
+  drive_file_id       String?          @db.VarChar(100)
+  preview_url         String?          @db.VarChar(500)
   category            library_category
   academic_department String?          @db.VarChar(100)
   academic_year       Int?

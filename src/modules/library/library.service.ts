@@ -140,6 +140,10 @@ export class LibraryService {
             description: data.description || null,
             drive_url: data.drive_url,
             category: data.category,
+            drive_file_id: this.extractDriveFileId(data.drive_url),
+            preview_url: this.extractDriveFileId(data.drive_url)
+                ? `https://drive.google.com/file/d/${this.extractDriveFileId(data.drive_url)}/preview`
+                : data.drive_url,
             academic_department: data.academic_department || null,
             academic_year: data.academic_year || null,
             course_id: data.course_id || null,
@@ -180,6 +184,11 @@ export class LibraryService {
         if (data.description !== undefined) updateData.description = data.description;
         if (data.drive_url) updateData.drive_url = data.drive_url;
         if (data.category) updateData.category = data.category;
+        if (data.drive_url) {
+            const fid = this.extractDriveFileId(data.drive_url);
+            updateData.drive_file_id = fid;
+            updateData.preview_url = fid ? `https://drive.google.com/file/d/${fid}/preview` : data.drive_url;
+        }
         if (data.academic_department !== undefined) updateData.academic_department = data.academic_department;
         if (data.academic_year !== undefined) updateData.academic_year = data.academic_year;
         if (data.course_id !== undefined) updateData.course_id = data.course_id;
