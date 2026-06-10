@@ -4,6 +4,7 @@ import path from 'path';
 import app from './app';
 import { env } from './config/env';
 import { db } from './config/db';
+import { initializeLibraryJobs } from './modules/library/library.jobs-init';
 
 // Ensure the uploads directory always exists (important for cloud deployments)
 fs.mkdirSync(path.join(process.cwd(), 'uploads'), { recursive: true });
@@ -14,6 +15,9 @@ const startServer = async () => {
     try {
         await db.$connect();
         console.log('📦 Connected to the database successfully');
+
+        // Initialize background jobs
+        initializeLibraryJobs();
 
         server.listen(env.PORT, () => {
             console.log(`🚀 Server is running on port ${env.PORT} in ${env.NODE_ENV} mode`);
