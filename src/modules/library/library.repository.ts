@@ -115,8 +115,6 @@ export class LibraryRepository {
     description?: string;
     drive_url: string;
     category: "SPIRITUAL" | "ACADEMIC" | "OTHER";
-    drive_file_id?: string | null;
-    preview_url?: string | null;
     academic_department?: string | null;
     academic_year?: number | null;
     course_id?: string | null;
@@ -134,8 +132,6 @@ export class LibraryRepository {
       description?: string;
       drive_url?: string;
       category?: "SPIRITUAL" | "ACADEMIC" | "OTHER";
-      drive_file_id?: string | null;
-      preview_url?: string | null;
       academic_department?: string | null;
       academic_year?: number | null;
       course_id?: string | null;

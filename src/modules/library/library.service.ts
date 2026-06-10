@@ -1,8 +1,8 @@
 import { libraryRepository } from './library.repository';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
 
-// Google Drive URL validation regex - accept /view, /preview, and open?id=FILE_ID forms
-const GOOGLE_DRIVE_URL_PATTERN = /^(?:https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)\/(?:view|preview)(?:.*)?|https:\/\/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+))(?:.*)?$/;
+// Updated: Accepts drive.google.com/file/... AND docs.google.com (documents, presentations, spreadsheets, forms)
+const GOOGLE_DRIVE_URL_PATTERN = /^(https?:\/\/)?(drive\.google\.com\/file\/d\/|docs\.google\.com\/(document|presentation|spreadsheets|forms)\/d\/)([a-zA-Z0-9_-]+)\/(?:edit|view|preview|viewform)(?:\?.*)?$/;
 
 export class LibraryService {
     async listAll() {
@@ -71,7 +71,7 @@ export class LibraryService {
         }));
     }
 
-    // FR-LIB-02: Validate Google Drive URLs only
+    // FR-LIB-02: Validate Google Drive URLs (now accepts docs.google.com)
     private validateGoogleDriveUrl(url: string): boolean {
         return GOOGLE_DRIVE_URL_PATTERN.test(url);
     }
@@ -80,7 +80,8 @@ export class LibraryService {
     private extractDriveFileId(url: string): string | null {
         const m = url.match(GOOGLE_DRIVE_URL_PATTERN);
         if (!m) return null;
-        return m[1] || m[2] || null;
+        // m[3] is the capture group for the file/document ID
+        return m[3] || null;
     }
 
     // FR-LIB-01: Reject direct binary file uploads
@@ -107,12 +108,13 @@ export class LibraryService {
     }
 
     async createItem(userRole: string, data: any) {
-        // FR-LIB-07: Only specific secretariat roles and education manager can create library items
+        // FR-LIB-07: Secretariat roles and Service Managers can create library items
         const allowedRoles = [
             'SECRETARIAT_CHAIRMAN',
             'SECRETARIAT_VICE',
             'SECRETARIAT_SECRETARY',
-            'EDUCATION_CLASS_MANAGER'
+            'SERVICE_MANAGER',
+            'SUPER_ADMIN'
         ];
 
         if (!allowedRoles.includes(userRole)) {
@@ -125,7 +127,7 @@ export class LibraryService {
         // FR-LIB-02: Validate Google Drive URL
         if (!this.validateGoogleDriveUrl(data.drive_url)) {
             throw new BadRequestError(
-                'Only public Google Drive URLs are accepted. Format: https://drive.google.com/file/d/{FILE_ID}/view'
+                'Only public Google Drive or Google Docs URLs are accepted. Examples: https://drive.google.com/file/d/.../view  or  https://docs.google.com/presentation/d/.../edit'
             );
         }
 
@@ -157,12 +159,12 @@ export class LibraryService {
         const item = await libraryRepository.findById(id);
         if (!item) throw new NotFoundError('Library item not found');
 
-        // FR-LIB-07: Only specific secretariat roles and education manager can edit
         const allowedRoles = [
             'SECRETARIAT_CHAIRMAN',
             'SECRETARIAT_VICE',
             'SECRETARIAT_SECRETARY',
-            'EDUCATION_CLASS_MANAGER'
+            'SERVICE_MANAGER',
+            'SUPER_ADMIN'
         ];
 
         if (!allowedRoles.includes(userRole)) {
@@ -175,7 +177,7 @@ export class LibraryService {
         // FR-LIB-02: Validate Google Drive URL if provided
         if (data.drive_url && !this.validateGoogleDriveUrl(data.drive_url)) {
             throw new BadRequestError(
-                'Only public Google Drive URLs are accepted. Format: https://drive.google.com/file/d/{FILE_ID}/view'
+                'Only public Google Drive or Google Docs URLs are accepted. Examples: https://drive.google.com/file/d/.../view  or  https://docs.google.com/presentation/d/.../edit'
             );
         }
 
@@ -201,12 +203,12 @@ export class LibraryService {
         const item = await libraryRepository.findById(id);
         if (!item) throw new NotFoundError('Library item not found');
 
-        // FR-LIB-07: Only specific secretariat roles and education manager can delete
         const allowedRolesDelete = [
             'SECRETARIAT_CHAIRMAN',
             'SECRETARIAT_VICE',
             'SECRETARIAT_SECRETARY',
-            'EDUCATION_CLASS_MANAGER'
+            'SERVICE_MANAGER',
+            'SUPER_ADMIN'
         ];
 
         if (!allowedRolesDelete.includes(userRole)) {

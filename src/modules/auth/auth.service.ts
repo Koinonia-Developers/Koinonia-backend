@@ -7,16 +7,19 @@ import { ConflictError, UnauthorizedError, ForbiddenError } from '../../utils/er
 
 const SALT_ROUNDS = 12;
 
+// ✅ generateToken includes serviceClassName
 const generateToken = (user: {
     id: string;
     system_role: string;
     service_class_id?: string | null;
+    service_class_name?: string | null;
 }) => {
     return jwt.sign(
         {
             userID: user.id,
             role: user.system_role,
             serviceClassID: user.service_class_id ?? null,
+            serviceClassName: user.service_class_name ?? null,
         },
         env.JWT_SECRET,
         { expiresIn: '7d' }
@@ -40,14 +43,24 @@ export class AuthService {
             profile_image_url: data.profile_image_url,
         });
 
-        const token = generateToken(user);
-        const { password_hash: _, ...userWithoutPassword } = user as any;
+        // Fetch again to get service class relation (since createUser doesn't include it)
+        const userWithClass = await authRepository.findById(user.id);
+        const serviceClassName = userWithClass?.service_classes?.class_name_amharic;
 
-        return { user: userWithoutPassword, token };
+        const tokenPayload = {
+            id: user.id,
+            system_role: user.system_role,
+            service_class_id: user.service_class_id,
+            service_class_name: serviceClassName,
+        };
+        const token = generateToken(tokenPayload);
+        const { password_hash: _, ...userWithoutPassword } = user as any;
+        return { user: { ...userWithoutPassword, serviceClassName }, token };
     }
 
     async login(data: LoginInput) {
         console.log('Login attempt with email:', data.email);
+        // ✅ findByEmail already includes service_classes
         const user = await authRepository.findByEmail(data.email);
         console.log('User found:', !!user, user?.email);
         if (!user) throw new UnauthorizedError('Invalid email or password');
@@ -56,24 +69,34 @@ export class AuthService {
         console.log('Password valid:', isPasswordValid);
         if (!isPasswordValid) throw new UnauthorizedError('Invalid email or password');
 
-        const token = generateToken(user);
+        const serviceClassName = user.service_classes?.class_name_amharic;
+        const tokenPayload = {
+            id: user.id,
+            system_role: user.system_role,
+            service_class_id: user.service_class_id,
+            service_class_name: serviceClassName,
+        };
+        const token = generateToken(tokenPayload);
         const { password_hash: _, ...userWithoutPassword } = user as any;
-
-        return { user: userWithoutPassword, token };
+        return { user: { ...userWithoutPassword, serviceClassName }, token };
     }
 
     async getUserById(id: string) {
+        // ✅ findById already includes service_classes
         const user = await authRepository.findById(id);
         if (!user) return null;
+        const serviceClassName = user.service_classes?.class_name_amharic;
         const { password_hash: _, ...userWithoutPassword } = user as any;
-        return userWithoutPassword;
+        return { ...userWithoutPassword, serviceClassName };
     }
 
     async updateProfile(id: string, data: any) {
         const user = await authRepository.updateProfile(id, data);
         if (!user) return null;
+        // updateProfile already includes service_classes in the returned user
+        const serviceClassName = user.service_classes?.class_name_amharic;
         const { password_hash: _, ...userWithoutPassword } = user as any;
-        return userWithoutPassword;
+        return { ...userWithoutPassword, serviceClassName };
     }
 }
 
