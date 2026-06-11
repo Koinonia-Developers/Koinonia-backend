@@ -6,7 +6,8 @@ import { UnauthorizedError, ForbiddenError } from '../utils/errors';
 export interface JwtPayload {
     userID: string;
     role: 'USER' | 'MEMBER' | 'TEACHER' | 'SERVICE_MANAGER' | 'SECRETARIAT_SECRETARY' | 'SECRETARIAT_VICE' | 'SECRETARIAT_CHAIRMAN' | 'SUPER_ADMIN' | 'CLASS_LEADER';
-    serviceClassID: string;
+    serviceClassID: string | null;
+    serviceClassName?: string | null;  // ADD THIS
     classLeaderOf?: string | null;
     status: string;
 }

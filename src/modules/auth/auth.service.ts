@@ -1,3 +1,4 @@
+// src/modules/auth/auth.service.ts
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';

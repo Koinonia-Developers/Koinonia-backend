@@ -34,6 +34,25 @@ model User {
   updated_at                                              DateTime             @default(now()) @db.Timestamptz(6)
   created_by                                              String?              @db.Uuid
   updated_by                                              String?              @db.Uuid
+
+  // Member Affairs fields
+  verification_status                                     String?              @default("PENDING_REVIEW") @db.VarChar(20)
+  preferred_class_id                                      String?              @db.Uuid
+  rejection_reason                                        String?              @db.Text
+  approved_at                                             DateTime?            @db.Timestamptz(6)
+  approved_by                                             String?              @db.Uuid
+  is_active                                               Boolean              @default(true)
+
+  // Relations
+  preferred_class                                         ServiceClass?        @relation("UserPreferredClass", fields: [preferred_class_id], references: [id])
+  approver                                                User?                @relation("UserApprover", fields: [approved_by], references: [id])
+  approved_users                                          User[]               @relation("UserApprover")
+  department_documents                                    DepartmentDocument[]
+  member_audit_logs                                       MembershipAuditLog[] @relation("auditLogMember")
+  performer_audit_logs                                    MembershipAuditLog[] @relation("auditLogPerformer")
+  sub_class_members                                       SubClassMember[]
+
+  // Existing relations (unchanged)
   announcements                                           Announcement[]
   comments                                                Comment[]
   course_submissions_course_submissions_created_byTousers course_submissions[] @relation("course_submissions_created_byTousers")
@@ -63,6 +82,8 @@ model User {
   @@index([service_class_id], map: "idx_users_service_class_id")
   @@index([system_role], map: "idx_users_system_role")
   @@index([university_id], map: "idx_users_university_id")
+  @@index([verification_status])
+  @@index([preferred_class_id])
   @@map("users")
 }
 
@@ -75,6 +96,8 @@ model ServiceClass {
   announcements          Announcement[]
   sub_classes            sub_classes[]
   users                  User[]
+  preferred_users        User[]         @relation("UserPreferredClass")
+  department_documents   DepartmentDocument[]
 
   @@map("service_classes")
 }
@@ -254,7 +277,56 @@ model reactions {
   @@index([announcement_id, user_id], map: "idx_reactions_announcement_id_user_id")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model SubClassMember {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sub_class_id String   @db.Uuid
+  user_id      String   @db.Uuid
+  assigned_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  sub_class    sub_classes @relation(fields: [sub_class_id], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([sub_class_id, user_id])
+  @@map("sub_class_members")
+}
+
+model DepartmentDocument {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_class_id String        @db.Uuid
+  document_type    String        @db.VarChar(20)
+  title            String?       @db.VarChar(200)
+  description      String?
+  drive_url        String        @db.VarChar(500)
+  academic_year    Int?
+  quarter          Int?
+  uploaded_by      String?       @db.Uuid
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime      @default(now()) @db.Timestamptz(6)
+
+  service_class    ServiceClass  @relation(fields: [service_class_id], references: [id], onDelete: Cascade)
+  uploader         User?         @relation(fields: [uploaded_by], references: [id])
+
+  @@index([service_class_id, document_type])
+  @@map("department_documents")
+}
+
+model MembershipAuditLog {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  member_id    String   @db.Uuid
+  action       String   @db.VarChar(50)
+  old_value    Json?
+  new_value    Json?
+  performed_by String?  @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  member       User @relation("auditLogMember", fields: [member_id], references: [id], onDelete: Cascade)
+  performer    User? @relation("auditLogPerformer", fields: [performed_by], references: [id])
+
+  @@index([member_id])
+  @@index([created_at])
+  @@map("membership_audit_logs")
+}
+
 model sub_classes {
   id                                        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   parent_class_id                           String       @db.Uuid
@@ -269,6 +341,7 @@ model sub_classes {
   users_sub_classes_sub_chair_idTousers     User?        @relation("sub_classes_sub_chair_idTousers", fields: [sub_chair_id], references: [id], onUpdate: NoAction)
   users_sub_classes_sub_secretary_idTousers User?        @relation("sub_classes_sub_secretary_idTousers", fields: [sub_secretary_id], references: [id], onUpdate: NoAction)
   users_sub_classes_sub_vice_idTousers      User?        @relation("sub_classes_sub_vice_idTousers", fields: [sub_vice_id], references: [id], onUpdate: NoAction)
+  members                                   SubClassMember[]
 }
 
 enum sub_class_status {
