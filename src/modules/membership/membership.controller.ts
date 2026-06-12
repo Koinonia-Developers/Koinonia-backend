@@ -6,6 +6,9 @@ import { ForbiddenError } from '../../utils/errors';
 
 async function verifyMemberAffairsLock(user: JwtPayload) {
     if (user.role === 'SERVICE_MANAGER') {
+        if (!user.serviceClassID) {
+            throw new ForbiddenError('Service class ID is required for SERVICE_MANAGER');
+        }
         const cls = await db.serviceClass.findUnique({ where: { id: user.serviceClassID } });
         if (cls?.class_name_amharic !== 'አባላት ጉዳይ ክፍል') {
             throw new ForbiddenError('Only the Member Affairs Manager can access this queue');

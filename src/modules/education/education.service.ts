@@ -3,6 +3,14 @@ import { BadRequestError, NotFoundError } from '../../utils/errors';
 
 const prisma = new PrismaClient();
 
+// ✅ GBI Gubae graduation phases
+const GUBAE_PHASES = ['gubae_abew', 'gubae_hawaryat', 'gubae_eclessia'];
+const GUBAE_NAMES = {
+  gubae_abew: 'Gubae Abew',
+  gubae_hawaryat: 'Gubae Hawaryat',
+  gubae_eclessia: 'Gubae Eclessia',
+};
+
 export class EducationService {
   // -------------------- BATCHES --------------------
   async listBatches(phase?: string) {
@@ -45,6 +53,107 @@ export class EducationService {
 
   async createSubject(data: { batchId: string; title: string; description?: string; order: number }) {
     return prisma.subject.create({ data });
+  }
+
+  // ✅ NEW: Get all members of education class to mark graduation status
+  async getAllEducationMembers(accessLevel?: string, userServiceClassId?: string) {
+    const where: any = { system_role: 'MEMBER' };
+    
+    // Get the education class service ID
+    const educationClass = await prisma.serviceClass.findFirst({
+      where: { class_name_amharic: 'የትምህርት ክፍል' },
+    });
+    
+    if (!educationClass) throw new NotFoundError('Education service class not found');
+    where.service_class_id = educationClass.id;
+
+    return prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        full_name_three_parts: true,
+        email: true,
+        university_id: true,
+        graduated_phases: true,
+        created_at: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  // ✅ NEW: Mark member as graduated from a Gubae phase
+  async markMemberGraduated(memberId: string, phase: string) {
+    if (!GUBAE_PHASES.includes(phase)) {
+      throw new BadRequestError(`Invalid phase. Must be one of: ${GUBAE_PHASES.join(', ')}`);
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: memberId } });
+    if (!user) throw new NotFoundError('Member not found');
+
+    // Parse graduated_phases JSON
+    let graduatedPhases: string[] = [];
+    if (user.graduated_phases) {
+      try {
+        graduatedPhases = JSON.parse(user.graduated_phases as string);
+      } catch {
+        graduatedPhases = [];
+      }
+    }
+
+    // Add phase if not already graduated
+    if (!graduatedPhases.includes(phase)) {
+      graduatedPhases.push(phase);
+    }
+
+    return prisma.user.update({
+      where: { id: memberId },
+      data: { graduated_phases: JSON.stringify(graduatedPhases) },
+      select: {
+        id: true,
+        full_name_three_parts: true,
+        graduated_phases: true,
+      },
+    });
+  }
+
+  // ✅ NEW: Remove graduation status from a phase
+  async removeMemberGraduation(memberId: string, phase: string) {
+    if (!GUBAE_PHASES.includes(phase)) {
+      throw new BadRequestError(`Invalid phase. Must be one of: ${GUBAE_PHASES.join(', ')}`);
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: memberId } });
+    if (!user) throw new NotFoundError('Member not found');
+
+    let graduatedPhases: string[] = [];
+    if (user.graduated_phases) {
+      try {
+        graduatedPhases = JSON.parse(user.graduated_phases as string);
+      } catch {
+        graduatedPhases = [];
+      }
+    }
+
+    // Remove phase
+    graduatedPhases = graduatedPhases.filter(p => p !== phase);
+
+    return prisma.user.update({
+      where: { id: memberId },
+      data: { graduated_phases: JSON.stringify(graduatedPhases) },
+      select: {
+        id: true,
+        full_name_three_parts: true,
+        graduated_phases: true,
+      },
+    });
+  }
+
+  // ✅ NEW: Get graduation phase names for display
+  getGubaePhases() {
+    return GUBAE_PHASES.map(phase => ({
+      id: phase,
+      name: GUBAE_NAMES[phase as keyof typeof GUBAE_NAMES],
+    }));
   }
 
   async createLesson(data: { subjectId: string; title: string; content: string; order: number }) {

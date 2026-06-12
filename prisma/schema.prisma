@@ -80,6 +80,10 @@ model User {
   users_users_updated_byTousers                           User?                @relation("users_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction)
   other_users_users_updated_byTousers                     User[]               @relation("users_updated_byTousers")
 
+  // Sub-class approval requests
+  approval_requests_initiated                             SubClassApprovalRequest[] @relation("SubClassApprovalRequestedBy")
+  approval_requests_approved                              SubClassApprovalRequest[] @relation("SubClassApprovalApprovedBy")
+
   @@index([created_at], map: "idx_users_created_at")
   @@index([repentance_father_id], map: "idx_users_repentance_father_id")
   @@index([service_class_id], map: "idx_users_service_class_id")
@@ -349,6 +353,7 @@ model sub_classes {
   users_sub_classes_sub_secretary_idTousers User?        @relation("sub_classes_sub_secretary_idTousers", fields: [sub_secretary_id], references: [id], onUpdate: NoAction)
   users_sub_classes_sub_vice_idTousers      User?        @relation("sub_classes_sub_vice_idTousers", fields: [sub_vice_id], references: [id], onUpdate: NoAction)
   members                                   SubClassMember[]
+  approval_requests                         SubClassApprovalRequest[]
 }
 
 enum sub_class_status {
@@ -484,4 +489,29 @@ model Exam {
   batch        lms_batches @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@map("exams")
+}
+
+// Sub-Class Approval Request tracking
+model SubClassApprovalRequest {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sub_class_id      String    @db.Uuid
+  request_type      String    @db.VarChar(50)  // 'CREATE' | 'ADD_LEADER' | 'UPDATE'
+  requested_by_id   String    @db.Uuid
+  requested_at      DateTime  @default(now()) @db.Timestamptz(6)
+  status            String    @default("PENDING") @db.VarChar(20)  // 'PENDING' | 'APPROVED' | 'REJECTED'
+  approved_by_id    String?   @db.Uuid
+  approved_at       DateTime? @db.Timestamptz(6)
+  rejection_reason  String?
+  request_data      Json      // stores the requested changes
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  requested_by      User      @relation("SubClassApprovalRequestedBy", fields: [requested_by_id], references: [id], onDelete: Cascade)
+  approved_by       User?     @relation("SubClassApprovalApprovedBy", fields: [approved_by_id], references: [id], onDelete: SetNull)
+  sub_classes       sub_classes @relation(fields: [sub_class_id], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([sub_class_id])
+  @@index([requested_by_id])
+  @@map("sub_class_approval_requests")
 }

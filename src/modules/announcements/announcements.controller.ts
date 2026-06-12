@@ -15,7 +15,7 @@ export class AnnouncementsController {
     async getAnnouncements(req: Request, res: Response, next: NextFunction) {
         try {
             const { userID, serviceClassID, role } = req.user!;
-            const announcements = await announcementsService.getAnnouncements(userID, serviceClassID, role);
+            const announcements = await announcementsService.getAnnouncements(userID, serviceClassID || '', role);
             res.status(200).json({ items: announcements, total: announcements.length });
         } catch (error) {
             next(error);

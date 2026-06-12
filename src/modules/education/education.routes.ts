@@ -29,5 +29,10 @@ router.get('/results', controller.getStudentResults);
 router.post('/results/:enrollmentId/subject/:subjectId/override', controller.overrideSubjectScore);
 router.post('/results/:enrollmentId/exit/override', controller.overrideExitScore);
 router.post('/enrollments/:id/graduate', controller.graduateMember);
+// ✅ NEW: Graduation features for GBI Gubae
+router.get('/members', controller.getAllEducationMembers);
+router.post('/members/graduate', controller.markMemberGraduated);
+router.post('/members/ungraduate', controller.removeMemberGraduation);
+router.get('/phases', controller.getGubaePhases);
 
 export default router;

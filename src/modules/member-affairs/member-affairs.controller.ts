@@ -27,7 +27,9 @@ export class MemberAffairsController {
   }
 
   async listMembers(req: Request, res: Response) {
-    const members = await memberAffairsService.listMembers(req.query);
+    const accessLevel = (req as any).accessLevel;
+    const userServiceClassId = (req as any).userServiceClassId;
+    const members = await memberAffairsService.listMembers(req.query, accessLevel, userServiceClassId);
     res.json(members);
   }
 
@@ -86,10 +88,18 @@ export class MemberAffairsController {
   }
 
   async createSubClass(req: Request, res: Response) {
-    const { serviceClassId } = req.params;
-    const serviceClassIdStr = Array.isArray(serviceClassId) ? serviceClassId[0] : serviceClassId;
-    const newSubClass = await memberAffairsService.createSubClass(serviceClassIdStr, req.body);
-    res.json(newSubClass);
+    try {
+      const { serviceClassId } = req.params;
+      const serviceClassIdStr = Array.isArray(serviceClassId) ? serviceClassId[0] : serviceClassId;
+      const userId = req.user?.userID;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const bypassApproval = (req as any).bypassApproval;
+      const newSubClass = await memberAffairsService.createSubClass(serviceClassIdStr, req.body, userId, bypassApproval);
+      res.json(newSubClass);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
   }
 
   async addMemberToSubClass(req: Request, res: Response) {
