@@ -16,7 +16,8 @@ import messagesRoutes from './modules/messages/messages.routes';
 import libraryRoutes from './modules/library/library.routes';
 import membershipRoutes from './modules/membership/membership.routes';
 import lmsRoutes from './modules/lms/lms.routes';
-import memberAffairsRoutes from './routes/memberAffairs.routes';  // ✅ ADD THIS
+import memberAffairsRoutes from './routes/memberAffairs.routes'; 
+import educationRoutes from './routes/education.routes';
 
 const app: Application = express();
 
@@ -53,7 +54,8 @@ app.use('/api/v1/messages', messagesRoutes);
 app.use('/api/v1/library', libraryRoutes);
 app.use('/api/v1/membership', membershipRoutes);
 app.use('/api/v1/lms', lmsRoutes);
-app.use('/api/v1/member-affairs', memberAffairsRoutes);  // ✅ ADD THIS
+app.use('/api/v1/member-affairs', memberAffairsRoutes);  
+app.use('/api/v1/education', educationRoutes);
 
 // ─── Health Check ───────────────────────────────────────────────────
 app.get('/health', (_req, res) => {

@@ -1,3 +1,4 @@
+// src/modules/member-affairs/member-affairs.controller.ts
 import { Request, Response } from 'express';
 import { memberAffairsService } from './member-affairs.service';
 

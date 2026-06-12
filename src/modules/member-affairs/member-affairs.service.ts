@@ -1,3 +1,4 @@
+// src/modules/member-affairs/member-affairs.service.ts
 import { PrismaClient } from '@prisma/client';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 
