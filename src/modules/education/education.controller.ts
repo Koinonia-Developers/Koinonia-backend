@@ -98,13 +98,17 @@ export class EducationController {
     const results = await educationService.getStudentResults(req.query);
     res.json(results);
   }
-  // ✅ NEW: Get all education members with graduation status
-  async getAllEducationMembers(req: Request, res: Response) {
-    const members = await educationService.getAllEducationMembers();
+
+  async getEducationClassMembers(req: Request, res: Response) {
+    const members = await educationService.getEducationClassMembers();
     res.json(members);
   }
 
-  // ✅ NEW: Mark member as graduated
+  async getEnrolledMembers(req: Request, res: Response) {
+    const members = await educationService.getEnrolledMembers();
+    res.json(members);
+  }
+
   async markMemberGraduated(req: Request, res: Response) {
     try {
       const { memberId, phase } = req.body;
@@ -118,7 +122,6 @@ export class EducationController {
     }
   }
 
-  // ✅ NEW: Remove graduation status
   async removeMemberGraduation(req: Request, res: Response) {
     try {
       const { memberId, phase } = req.body;
@@ -132,11 +135,12 @@ export class EducationController {
     }
   }
 
-  // ✅ NEW: Get graduation phases
   async getGubaePhases(req: Request, res: Response) {
     const phases = educationService.getGubaePhases();
     res.json(phases);
-  }  async overrideSubjectScore(req: Request, res: Response) {
+  }
+
+  async overrideSubjectScore(req: Request, res: Response) {
     const { enrollmentId, subjectId } = req.params;
     const enrollmentIdStr = Array.isArray(enrollmentId) ? enrollmentId[0] : enrollmentId;
     const subjectIdStr = Array.isArray(subjectId) ? subjectId[0] : subjectId;

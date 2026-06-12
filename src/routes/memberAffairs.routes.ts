@@ -1,4 +1,3 @@
-// src/routes/memberAffairs.routes.ts
 import { Router } from 'express';
 import { MemberAffairsController } from '../modules/member-affairs/member-affairs.controller';
 import { requireAuth } from '../middleware/auth';
@@ -50,5 +49,8 @@ router.get('/sub-classes/:serviceClassId', requireServiceClassAccess, controller
 router.post('/sub-classes/:serviceClassId', requireServiceClassAccess, requireSubClassApproval, controller.createSubClass);
 router.post('/sub-classes/:subClassId/members', requireServiceClassAccess, validateLeaderAssignment, controller.addMemberToSubClass);
 router.delete('/sub-classes/:subClassId/members/:userId', requireServiceClassAccess, controller.removeMemberFromSubClass);
+
+// ✅ DELETE a sub‑class (authorization handled inside service)
+router.delete('/sub-classes/:subClassId', requireAuth, controller.deleteSubClass);
 
 export default router;

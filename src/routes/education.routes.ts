@@ -6,17 +6,23 @@ import { requireEducationManager } from '../middleware/educationGuard';
 const router = Router();
 const controller = new EducationController();
 
-// Public (member) routes – require auth
 router.use(requireAuth);
+
+// Public (member) routes
 router.get('/batches', controller.listBatches);
 router.get('/batches/:id/subjects', controller.getSubjectsWithLessons);
 router.get('/enrollments/my/:phase', controller.getMyEnrollment);
 router.post('/enrollments/request', controller.requestRegistration);
 router.post('/exams/:id/submit', controller.submitExam);
 router.get('/exams/:id', controller.getExam);
+router.get('/phases', controller.getGubaePhases);
 
 // Manager only routes
 router.use(requireEducationManager);
+router.get('/class-members', controller.getEducationClassMembers);
+router.get('/enrolled-members', controller.getEnrolledMembers);
+router.post('/members/graduate', controller.markMemberGraduated);
+router.post('/members/ungraduate', controller.removeMemberGraduation);
 router.post('/batches', controller.createBatch);
 router.post('/subjects', controller.createSubject);
 router.post('/lessons', controller.createLesson);

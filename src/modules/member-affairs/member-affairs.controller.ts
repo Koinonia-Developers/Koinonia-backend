@@ -101,6 +101,26 @@ export class MemberAffairsController {
       res.status(400).json({ error: err.message });
     }
   }
+async deleteSubClass(req: Request, res: Response) {
+  const { subClassId } = req.params;
+  
+  // Debug logging (remove after fixing)
+  console.log('DELETE request params:', req.params);
+  
+  if (!subClassId) {
+    return res.status(400).json({ error: 'Sub-class ID is required' });
+  }
+  
+  const subClassIdStr = Array.isArray(subClassId) ? subClassId[0] : subClassId;
+  const userId = req.user?.userID;
+  
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  const result = await memberAffairsService.deleteSubClass(subClassIdStr, userId);
+  res.json(result);
+}
 
   async addMemberToSubClass(req: Request, res: Response) {
     const { subClassId } = req.params;

@@ -1,6 +1,5 @@
-// src/modules/member-affairs/member-affairs.service.ts
 import { PrismaClient } from '@prisma/client';
-import { BadRequestError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError } from '../../utils/errors';
 import { approvalService } from '../approvals/approval.service';
 
 const prisma = new PrismaClient();
@@ -69,17 +68,12 @@ export class MemberAffairsService {
   async listMembers(filters: any, accessLevel?: string, userServiceClassId?: string) {
     const where: any = { system_role: 'MEMBER' };
 
-    // Apply service class filter based on access level
     if (accessLevel === 'own-class-only' && userServiceClassId) {
-      // SERVICE_MANAGER (non-Member Affairs): only own class
       where.service_class_id = userServiceClassId;
     } else if (filters.serviceClassId) {
-      // Explicit filter if provided
       where.service_class_id = filters.serviceClassId;
     }
-    // If 'full' or 'read-only': no service class filter (can see all)
 
-    // ✅ Fix: parse academicYear string to integer
     if (filters.academicYear) {
       const year = parseInt(filters.academicYear, 10);
       if (!isNaN(year)) where.academic_year = year;
@@ -106,7 +100,6 @@ export class MemberAffairsService {
     });
   }
 
-  // ✅ Fixed updateMember with proper type conversion
   async updateMember(adminId: string, memberId: string, data: any) {
     const old = await prisma.user.findUnique({ where: { id: memberId } });
     if (!old) throw new NotFoundError('Member not found');
@@ -115,8 +108,6 @@ export class MemberAffairsService {
 
     if (data.service_class_id !== undefined) {
       updateData.service_class_id = data.service_class_id || null;
-      
-      // ✅ If service class is changing, clear leadership positions in sub-classes of old service class
       if (old.service_class_id && old.service_class_id !== data.service_class_id) {
         await prisma.sub_classes.updateMany({
           where: {
@@ -207,126 +198,146 @@ export class MemberAffairsService {
   }
 
   // -------------------- SUB‑CLASS MANAGEMENT --------------------
-  async listSubClasses(serviceClassId: string) {
-    return prisma.sub_classes.findMany({
-      where: { parent_class_id: serviceClassId, status: 'APPROVED' },
-      include: {
-        users_sub_classes_sub_chair_idTousers: true,
-        users_sub_classes_sub_secretary_idTousers: true,
-        users_sub_classes_sub_vice_idTousers: true,
-        members: { include: { user: true } },
-      },
+ async listSubClasses(serviceClassId: string) {
+  const subClasses = await prisma.sub_classes.findMany({
+    where: { parent_class_id: serviceClassId, status: 'APPROVED' },
+    include: {
+      users_sub_classes_sub_chair_idTousers: true,
+      users_sub_classes_sub_secretary_idTousers: true,
+      users_sub_classes_sub_vice_idTousers: true,
+      members: { include: { user: true } },
+    },
+  });
+  return subClasses;
+}
+
+  /**
+   * Check if a member has graduated at least Gubae Hawaryat (or Eclessia).
+   * Normalises phase strings to lowercase for comparison.
+   */
+  private async hasSufficientGraduation(userId: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { graduated_phases: true },
     });
+    if (!user) return false;
+    let phases: string[] = [];
+    try {
+      phases = JSON.parse(user.graduated_phases as string);
+      phases = phases.map(p => p.toLowerCase());
+    } catch {
+      phases = [];
+    }
+    return phases.includes('gubae_hawaryat') || phases.includes('gubae_eclessia');
   }
 
-  async createSubClass(serviceClassId: string, data: any, requestedById: string, bypassApproval: boolean = false) {
-    const { sub_class_name, sub_chair_id, sub_secretary_id, sub_vice_id } = data;
-
-    if (!sub_class_name?.trim()) {
-      throw new BadRequestError('sub_class_name is required');
+  private async validateLeaderGraduation(leaderId: string, roleName: string): Promise<void> {
+    const hasGraduation = await this.hasSufficientGraduation(leaderId);
+    if (!hasGraduation) {
+      throw new BadRequestError(`${roleName} must have completed at least Gubae Hawaryat (or higher) to be assigned as sub‑class leader.`);
     }
+  }
 
-    // ✅ Validation 1: Check for duplicate sub-class names in same service class
-    const existingSubClass = await prisma.sub_classes.findFirst({
+ async createSubClass(serviceClassId: string, data: any, requestedById: string, bypassApproval: boolean = false) {
+  const { sub_class_name, sub_chair_id, sub_secretary_id, sub_vice_id } = data;
+
+  if (!sub_class_name?.trim()) {
+    throw new BadRequestError('sub_class_name is required');
+  }
+
+  // Check duplicate name
+  const existingSubClass = await prisma.sub_classes.findFirst({
+    where: {
+      parent_class_id: serviceClassId,
+      sub_class_name: sub_class_name.trim(),
+    },
+  });
+  if (existingSubClass) {
+    throw new BadRequestError(`Sub-class "${sub_class_name}" already exists in this service class`);
+  }
+
+  // Collect leader IDs
+  const leaderIds = [sub_chair_id, sub_secretary_id, sub_vice_id].filter(Boolean);
+  if (leaderIds.length > 0) {
+    const existingLeadership = await prisma.sub_classes.findFirst({
       where: {
         parent_class_id: serviceClassId,
-        sub_class_name: sub_class_name.trim(),
+        OR: [
+          { sub_chair_id: { in: leaderIds } },
+          { sub_secretary_id: { in: leaderIds } },
+          { sub_vice_id: { in: leaderIds } },
+        ],
       },
     });
-    if (existingSubClass) {
-      throw new BadRequestError(`Sub-class "${sub_class_name}" already exists in this service class`);
+    if (existingLeadership) {
+      throw new BadRequestError('One or more selected leaders already hold leadership positions in other sub‑classes of this service class');
     }
+  }
 
-    // ✅ Validation 2: Check if leader/secretary is already assigned to another sub-class in same service class
-    const leaderIds = [sub_chair_id, sub_secretary_id, sub_vice_id].filter(Boolean);
-    if (leaderIds.length > 0) {
-      const existingLeadership = await prisma.sub_classes.findFirst({
-        where: {
-          parent_class_id: serviceClassId,
-          OR: [
-            { sub_chair_id: { in: leaderIds } },
-            { sub_secretary_id: { in: leaderIds } },
-            { sub_vice_id: { in: leaderIds } },
-          ],
-        },
-      });
-      if (existingLeadership) {
-        throw new BadRequestError('One or more selected leaders already hold leadership positions in other sub-classes of this service class');
-      }
+  // Validate that leaders belong to the same service class
+  const serviceClass = await prisma.serviceClass.findUnique({ where: { id: serviceClassId } });
+  if (!serviceClass) throw new NotFoundError('Service class not found');
+
+  for (const leaderId of leaderIds) {
+    const leader = await prisma.user.findUnique({ where: { id: leaderId } });
+    if (!leader || leader.service_class_id !== serviceClassId) {
+      throw new BadRequestError(`Selected leader must be a member of ${serviceClass.class_name_amharic}`);
     }
+  }
 
-    // ✅ Validation 3: Check that leaders are members of the same service class
-    const serviceClass = await prisma.serviceClass.findUnique({ where: { id: serviceClassId } });
-    if (!serviceClass) throw new NotFoundError('Service class not found');
+  // Graduation requirement for leaders
+  if (sub_chair_id) await this.validateLeaderGraduation(sub_chair_id, 'Sub‑chair');
+  if (sub_secretary_id) await this.validateLeaderGraduation(sub_secretary_id, 'Sub‑secretary');
+  if (sub_vice_id) await this.validateLeaderGraduation(sub_vice_id, 'Sub‑vice');
 
-    for (const leaderId of leaderIds) {
-      const leader = await prisma.user.findUnique({ where: { id: leaderId } });
-      if (!leader || leader.service_class_id !== serviceClassId) {
-        throw new BadRequestError(`Selected leader must be a member of ${serviceClass.class_name_amharic}`);
-      }
-    }
+  // Prepare data for creation (always include leader IDs)
+  const createData: any = {
+    parent_class_id: serviceClassId,
+    sub_class_name: sub_class_name.trim(),
+    sub_chair_id: sub_chair_id || null,
+    sub_secretary_id: sub_secretary_id || null,
+    sub_vice_id: sub_vice_id || null,
+  };
 
-    // If SECRETARIAT, create immediately without approval
-    if (bypassApproval) {
-      return prisma.sub_classes.create({
-        data: {
-          parent_class_id: serviceClassId,
-          sub_class_name: sub_class_name.trim(),
-          sub_chair_id,
-          sub_secretary_id,
-          sub_vice_id,
-          status: 'APPROVED',
-        },
-        include: {
-          users_sub_classes_sub_chair_idTousers: true,
-          users_sub_classes_sub_secretary_idTousers: true,
-          users_sub_classes_sub_vice_idTousers: true,
-        },
-      });
-    }
+  if (bypassApproval) {
+    createData.status = 'APPROVED';
+  } else {
+    createData.status = 'PENDING_APPROVAL';
+  }
 
-    // For SERVICE_MANAGER, create with PENDING_APPROVAL status and send approval request
-    const subClass = await prisma.sub_classes.create({
-      data: {
-        parent_class_id: serviceClassId,
-        sub_class_name: sub_class_name.trim(),
-        status: 'PENDING_APPROVAL',
-      },
-      include: {
-        users_sub_classes_sub_chair_idTousers: true,
-        users_sub_classes_sub_secretary_idTousers: true,
-        users_sub_classes_sub_vice_idTousers: true,
-      },
-    });
+  const subClass = await prisma.sub_classes.create({
+    data: createData,
+    include: {
+      users_sub_classes_sub_chair_idTousers: true,
+      users_sub_classes_sub_secretary_idTousers: true,
+      users_sub_classes_sub_vice_idTousers: true,
+    },
+  });
 
-    // Send approval request to chairman
-    await approvalService.requestSubClassApproval(
-      'CREATE',
-      subClass.id,
-      requestedById,
-      data
-    );
-
+  // If not bypassing approval, notify chairman
+  if (!bypassApproval) {
+    await approvalService.requestSubClassApproval('CREATE', subClass.id, requestedById, data);
     return {
       ...subClass,
       _notice: 'Sub-class created with PENDING_APPROVAL status. Chairman notification sent.',
     };
   }
 
+  return subClass;
+}
   async addMemberToSubClass(subClassId: string, userId: string) {
     return prisma.subClassMember.create({
       data: { sub_class_id: subClassId, user_id: userId },
     });
   }
 
-  // ✅ NEW: Update sub-class with validation for duplicate names and leadership
   async updateSubClass(serviceClassId: string, subClassId: string, data: any) {
     const existing = await prisma.sub_classes.findUnique({ where: { id: subClassId } });
     if (!existing) throw new NotFoundError('Sub-class not found');
 
     const updateData: any = {};
 
-    // ✅ Validation: Check for duplicate sub-class names (only if name is changing)
+    // Duplicate name validation
     if (data.sub_class_name !== undefined && data.sub_class_name.trim() !== existing.sub_class_name) {
       const duplicate = await prisma.sub_classes.findFirst({
         where: {
@@ -336,12 +347,12 @@ export class MemberAffairsService {
         },
       });
       if (duplicate) {
-        throw new BadRequestError(`Sub-class \"${data.sub_class_name}\" already exists in this service class`);
+        throw new BadRequestError(`Sub-class "${data.sub_class_name}" already exists in this service class`);
       }
       updateData.sub_class_name = data.sub_class_name.trim();
     }
 
-    // ✅ Validation: Check for duplicate leadership (only if leaders are changing)
+    // Leadership conflict validation
     const newLeaderIds = [
       data.sub_chair_id !== undefined ? data.sub_chair_id : existing.sub_chair_id,
       data.sub_secretary_id !== undefined ? data.sub_secretary_id : existing.sub_secretary_id,
@@ -361,11 +372,11 @@ export class MemberAffairsService {
         },
       });
       if (otherLeadership) {
-        throw new BadRequestError('One or more selected leaders already hold leadership positions in other sub-classes of this service class');
+        throw new BadRequestError('One or more selected leaders already hold leadership positions in other sub‑classes of this service class');
       }
     }
 
-    // ✅ Validation: Check that leaders are members of same service class
+    // Verify leaders belong to the service class
     const serviceClass = await prisma.serviceClass.findUnique({ where: { id: serviceClassId } });
     if (!serviceClass) throw new NotFoundError('Service class not found');
 
@@ -375,6 +386,17 @@ export class MemberAffairsService {
       if (!leader || leader.service_class_id !== serviceClassId) {
         throw new BadRequestError(`Selected leader must be a member of ${serviceClass.class_name_amharic}`);
       }
+    }
+
+    // Graduation requirement for newly assigned leaders
+    if (data.sub_chair_id !== undefined && data.sub_chair_id !== existing.sub_chair_id && data.sub_chair_id) {
+      await this.validateLeaderGraduation(data.sub_chair_id, 'Sub‑chair');
+    }
+    if (data.sub_secretary_id !== undefined && data.sub_secretary_id !== existing.sub_secretary_id && data.sub_secretary_id) {
+      await this.validateLeaderGraduation(data.sub_secretary_id, 'Sub‑secretary');
+    }
+    if (data.sub_vice_id !== undefined && data.sub_vice_id !== existing.sub_vice_id && data.sub_vice_id) {
+      await this.validateLeaderGraduation(data.sub_vice_id, 'Sub‑vice');
     }
 
     if (data.sub_chair_id !== undefined) updateData.sub_chair_id = data.sub_chair_id || null;
@@ -396,6 +418,35 @@ export class MemberAffairsService {
     return prisma.subClassMember.deleteMany({
       where: { sub_class_id: subClassId, user_id: userId },
     });
+  }
+
+  async deleteSubClass(subClassId: string, userId: string) {
+    if (!subClassId) {
+      throw new BadRequestError('Sub-class ID is required');
+    }
+
+    const subClass = await prisma.sub_classes.findUnique({
+      where: { id: subClassId },
+      include: { members: true },
+    });
+    if (!subClass) throw new NotFoundError('Sub-class not found');
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedError('User not found');
+
+    const secretariatRoles = ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SUPER_ADMIN'];
+    const isSecretariat = secretariatRoles.includes(user.system_role);
+    const isServiceManagerOfClass = user.system_role === 'SERVICE_MANAGER' && user.service_class_id === subClass.parent_class_id;
+
+    if (!isSecretariat && !isServiceManagerOfClass) {
+      throw new ForbiddenError('You do not have permission to delete this sub‑class');
+    }
+
+    if (subClass.members.length > 0) {
+      throw new BadRequestError('Cannot delete sub‑class that has members. Remove members first.');
+    }
+
+    return prisma.sub_classes.delete({ where: { id: subClassId } });
   }
 
   // -------------------- DEPARTMENT DOCUMENTS --------------------
