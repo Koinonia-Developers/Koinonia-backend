@@ -1,3 +1,4 @@
+//src/modules/notifications/notifications.routes.ts
 import { Router } from 'express';
 import { notificationsController } from './notifications.controller';
 import { requireAuth, requireActiveStatus } from '../../middleware/auth';

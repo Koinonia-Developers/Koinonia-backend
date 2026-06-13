@@ -33,8 +33,19 @@ export class EducationController {
     const { id } = req.params;
     const idStr = Array.isArray(id) ? id[0] : id;
     const { quotedText, explanation } = req.body;
-    const result = await educationService.addInlineExplanation(idStr, quotedText, explanation);
-    res.json(result);
+    try {
+      const result = await educationService.addInlineExplanation(idStr, quotedText, explanation);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  async getLessonExplanations(req: Request, res: Response) {
+    const { id } = req.params;
+    const idStr = Array.isArray(id) ? id[0] : id;
+    const explanations = await educationService.getLessonExplanations(idStr);
+    res.json(explanations);
   }
 
   // Exams
@@ -161,4 +172,26 @@ export class EducationController {
     const result = await educationService.graduateMember(idStr);
     res.json(result);
   }
+  async updateExplanation(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { quotedText, explanation } = req.body;
+    const idStr = Array.isArray(id) ? id[0] : id;
+    const result = await educationService.updateExplanation(idStr, quotedText, explanation);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async deleteExplanation(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const idStr = Array.isArray(id) ? id[0] : id;
+    const result = await educationService.deleteExplanation(idStr);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+}
 }

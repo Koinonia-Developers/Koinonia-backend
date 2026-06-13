@@ -456,21 +456,17 @@ model Lesson {
   updatedAt   DateTime @updatedAt
 
   subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  inlineExplanations InlineExplanation[]
 
   @@map("lessons")
 }
-
 model InlineExplanation {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  lessonId    String   @db.Uuid
+  lessonId    String   // no @db.Uuid, no relation
   quotedText  String
-  explanation String   // HTML
+  explanation String
   createdAt   DateTime @default(now())
 
-  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-
-  @@map("inline_explanations")
+  @@map("inline_explanations")   // ← ADD THIS LINE
 }
 
 model Exam {

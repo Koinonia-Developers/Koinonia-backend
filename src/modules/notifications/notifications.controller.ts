@@ -1,3 +1,4 @@
+//src/modules/notifications/notifications.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { notificationsService } from './notifications.service';
 

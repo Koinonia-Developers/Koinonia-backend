@@ -1,3 +1,4 @@
+//src/modules/notifications/notifications.service.ts
 import { notificationsRepository } from './notifications.repository';
 import { JwtPayload } from '../../middleware/auth';
 
