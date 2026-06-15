@@ -128,7 +128,9 @@ export class MemberAffairsController {
   async uploadSecretariatDocument(req: Request, res: Response) {
     const uploadedBy = req.user?.userID;
     if (!uploadedBy) return res.status(401).json({ error: 'Unauthorized' });
-    const userRole = req.user?.role || (req.user as any).system_role;
+    // Try to get system_role first, then fall back to role
+    const userRole = (req.user as any)?.system_role || req.user?.role;
+    if (!userRole) return res.status(400).json({ error: 'User role not found' });
     const doc = await memberAffairsService.uploadDocument(null, req.body, uploadedBy, userRole);
     res.json(doc);
   }

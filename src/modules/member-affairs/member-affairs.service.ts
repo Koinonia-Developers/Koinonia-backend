@@ -398,17 +398,46 @@ export class MemberAffairsService {
 
   // -------------------- DOCUMENTS --------------------
   async uploadDocument(serviceClassId: string | null, data: any, uploadedBy: string, userRole: string) {
-    const secretariatRoles = ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SUPER_ADMIN'];
+    const secretariatRoles = ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY'];
     const isSecretariat = secretariatRoles.includes(userRole);
-    if (serviceClassId === null || serviceClassId === '') {
-      if (!isSecretariat) {
-        throw new BadRequestError('Service class ID is required for non-secretariat users');
+    
+    let finalServiceClassId: string;
+    
+    // If service class is provided, use it
+    if (serviceClassId && serviceClassId !== '') {
+      finalServiceClassId = serviceClassId;
+    } else if (isSecretariat) {
+      // For secretariat users without a service class, try to use or create "General Assembly" class
+      let defaultClass = await prisma.serviceClass.findFirst({
+        where: { class_name_amharic: 'General Assembly' },
+      });
+      
+      // If it doesn't exist, try to get the first available class, or create General Assembly
+      if (!defaultClass) {
+        defaultClass = await prisma.serviceClass.findFirst({
+          orderBy: { created_at: 'asc' },
+        });
+        
+        // If no classes exist at all, create General Assembly
+        if (!defaultClass) {
+          defaultClass = await prisma.serviceClass.create({
+            data: {
+              class_name_amharic: 'General Assembly',
+              is_public_registration: false,
+            },
+          });
+        }
       }
-      throw new BadRequestError('Service class ID is required');
+      
+      finalServiceClassId = defaultClass.id;
+    } else {
+      // For non-secretariat users, service class is required
+      throw new BadRequestError('Service class ID is required for non-secretariat users');
     }
+    
     return prisma.departmentDocument.create({
       data: {
-        service_class_id: serviceClassId,
+        service_class_id: finalServiceClassId,
         document_type: data.document_type,
         title: data.title,
         description: data.description,
@@ -592,7 +621,7 @@ export class MemberAffairsService {
             title: 'New Document Pending Approval',
             message: 'A new document has been uploaded and is waiting for your approval',
             type: 'DOCUMENT_PENDING',
-            target_route: '/member-affairs/documents',
+            target_route: '/dashboard/member-affairs?tab=documents',
           },
         });
       }
@@ -621,7 +650,7 @@ export class MemberAffairsService {
             title: 'Document Approved',
             message: `"${documentTitle}" has been approved and is now visible to all members`,
             type: 'DOCUMENT_APPROVED',
-            target_route: '/member-affairs/documents',
+            target_route: '/dashboard/member-affairs?tab=documents',
           },
         });
       }
@@ -639,7 +668,7 @@ export class MemberAffairsService {
           title: 'Document Rejected',
           message: `"${documentTitle}" has been rejected${reason ? `: ${reason}` : ''}`,
           type: 'DOCUMENT_REJECTED',
-          target_route: '/member-affairs/documents',
+          target_route: '/dashboard/member-affairs?tab=documents',
         },
       });
     } catch (error) {
@@ -656,7 +685,7 @@ export class MemberAffairsService {
           title: 'New Comment',
           message: `Someone has commented on "${documentTitle}"`,
           type: 'COMMENT_ADDED',
-          target_route: '/member-affairs/documents',
+          target_route: '/dashboard/member-affairs?tab=documents',
         },
       });
     } catch (error) {
@@ -673,7 +702,7 @@ export class MemberAffairsService {
           title: 'New Reaction',
           message: `Someone reacted to "${documentTitle}"`,
           type: 'REACTION_ADDED',
-          target_route: '/member-affairs/documents',
+          target_route: '/dashboard/member-affairs?tab=documents',
         },
       });
     } catch (error) {
