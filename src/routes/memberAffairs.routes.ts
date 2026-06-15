@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/auth';
 import { requireServiceClassAccess, requireSubClassApproval } from '../middleware/serviceClassGuard';
 import { requireMemberAffairsAccess } from '../middleware/memberAffairsGuard';
+import { requireSecretariat } from '../middleware/requireSecretariat';
 import { 
   requireMemberAccess, 
   validateMemberAccess, 
@@ -14,22 +15,18 @@ import {
 const router = Router();
 const controller = new MemberAffairsController();
 
-// All routes require authentication
 router.use(requireAuth);
 
-// ============ MEMBER MANAGEMENT ENDPOINTS (with access control by service class) ============
-// These endpoints now use requireMemberAccess which checks:
-// - SECRETARIAT: full access (chairman read-only)
-// - MEMBER_AFFAIRS: can view all + modify members (but leadership restricted)
-// - SERVICE_MANAGER: can view/modify only their own service class members
-// - CHAIRMAN: read-only access to all members
+// ============ SECRETARIAT DOCUMENT ENDPOINTS (no service class) ============
+router.post('/documents/secretariat', requireAuth, requireSecretariat, controller.uploadSecretariatDocument);
+router.get('/documents/secretariat/:type', requireAuth, requireSecretariat, controller.listSecretariatDocuments);
 
+// ============ MEMBER MANAGEMENT ============
 router.get('/members', requireMemberAccess, controller.listMembers);
 router.get('/members/:id', requireMemberAccess, validateMemberAccess, controller.getMember);
 router.patch('/members/:id', requireMemberAccess, validateMemberAccess, validateMemberWrite, controller.updateMember);
 
-// ============ MEMBER AFFAIRS OPERATIONS (approval workflow - Member Affairs manager only) ============
-// These endpoints require MEMBER_AFFAIRS_ACCESS specifically for approval operations
+// ============ MEMBER AFFAIRS OPERATIONS ============
 router.get('/pending', requireMemberAffairsAccess, controller.getPending);
 router.post('/approve/:userId', requireMemberAffairsAccess, controller.approve);
 router.post('/reject/:userId', requireMemberAffairsAccess, controller.reject);
@@ -37,20 +34,33 @@ router.get('/unassigned-spiritual', requireMemberAffairsAccess, controller.getUn
 router.get('/spiritual-candidates', requireMemberAffairsAccess, controller.getSpiritualCandidates);
 router.post('/assign-spiritual/:memberId', requireMemberAffairsAccess, controller.assignSpiritual);
 router.post('/batch-assign', requireMemberAffairsAccess, controller.batchAssign);
+
+// ============ SUB-CLASS OPERATIONS ============
+router.get('/sub-classes/:serviceClassId', requireServiceClassAccess, controller.listSubClasses);
+router.post('/sub-classes/:serviceClassId', requireServiceClassAccess, requireSubClassApproval, controller.createSubClass);
+router.post('/sub-classes/:subClassId/members', requireServiceClassAccess, validateLeaderAssignment, controller.addMemberToSubClass);
+router.delete('/sub-classes/:subClassId/members/:userId', requireServiceClassAccess, controller.removeMemberFromSubClass);
+router.delete('/sub-classes/:subClassId', requireAuth, controller.deleteSubClass);
+
+// ============ DOCUMENTS (for service managers, with service class) ============
 router.get('/documents/:serviceClassId/:type', requireMemberAffairsAccess, controller.listDocuments);
 router.post('/documents/:serviceClassId', requireMemberAffairsAccess, controller.uploadDocument);
 router.delete('/documents/:id', requireMemberAffairsAccess, controller.deleteDocument);
 
-// ============ SUB-CLASS OPERATIONS (with service class access control) ============
-// Read: allowed for all service managers of their class
-router.get('/sub-classes/:serviceClassId', requireServiceClassAccess, controller.listSubClasses);
+// ============ DOCUMENT APPROVAL, COMMENTS, REACTIONS (shared) ============
+router.get('/documents/:id', requireAuth, controller.getDocument);
+router.post('/documents/:id/approve', requireAuth, requireRole(['SECRETARIAT_CHAIRMAN']), controller.approveDocument);
+router.post('/documents/:id/reject', requireAuth, requireRole(['SECRETARIAT_CHAIRMAN']), controller.rejectDocument);
+router.post('/documents/:id/comments', requireAuth, controller.addComment);
+router.delete('/documents/comments/:commentId', requireAuth, controller.deleteComment);
+router.post('/documents/:id/reactions', requireAuth, controller.addReaction);
+router.delete('/documents/:id/reactions', requireAuth, controller.removeReaction);
 
-// Write: requires approval unless SECRETARIAT, plus leader validation
-router.post('/sub-classes/:serviceClassId', requireServiceClassAccess, requireSubClassApproval, controller.createSubClass);
-router.post('/sub-classes/:subClassId/members', requireServiceClassAccess, validateLeaderAssignment, controller.addMemberToSubClass);
-router.delete('/sub-classes/:subClassId/members/:userId', requireServiceClassAccess, controller.removeMemberFromSubClass);
-
-// ✅ DELETE a sub‑class (authorization handled inside service)
-router.delete('/sub-classes/:subClassId', requireAuth, controller.deleteSubClass);
+// ============ NOTIFICATIONS ============
+router.post('/notifications/document-pending', requireAuth, controller.notifyChairmanOfPendingDocument);
+router.post('/notifications/document-approved', requireAuth, controller.notifyDocumentApproved);
+router.post('/notifications/document-rejected', requireAuth, controller.notifyDocumentRejected);
+router.post('/notifications/comment-added', requireAuth, controller.notifyCommentAdded);
+router.post('/notifications/reaction-added', requireAuth, controller.notifyReactionAdded);
 
 export default router;

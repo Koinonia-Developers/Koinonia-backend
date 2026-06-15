@@ -1,3 +1,4 @@
+// src/modules/member-affairs/member-affairs.service.ts
 import { Request, Response, NextFunction } from 'express';
 import { membershipService } from './membership.service';
 import { JwtPayload } from '../../middleware/auth';

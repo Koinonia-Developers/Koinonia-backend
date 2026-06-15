@@ -1,3 +1,4 @@
+// src/modules/membership/membership.service.ts
 import { db } from '../../config/db';
 import { NotFoundError, BadRequestError } from '../../utils/errors';
 

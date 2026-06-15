@@ -9,51 +9,57 @@ datasource db {
 }
 
 model User {
-  id                                                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  full_name_three_parts                                   String               @db.VarChar(150)
-  email                                                   String               @unique(map: "idx_users_email") @db.VarChar(100)
-  password_hash                                           String               @db.VarChar(255)
-  university_id                                           String?              @unique @db.VarChar(50)
-  academic_dept                                           String?              @db.VarChar(100)
-  academic_year                                           Int?
-  dorm_block                                              String?              @db.VarChar(20)
-  dorm_room                                               String?              @db.VarChar(20)
-  phone_number                                            String?              @db.VarChar(20)
-  profile_image_url                                       String?              @default("/assets/avatar.png") @db.VarChar(255)
-  bio                                                     String?
-  sex                                                     Sex?
-  clerical_rank                                           ClericalRank         @default(NONE)
-  system_role                                             system_role          @default(USER)
-  service_class_id                                        String?              @db.Uuid
-  pending_class_id                                        String?              @db.Uuid
-  repentance_father_id                                    String?              @db.Uuid
-  repentance_deacon_id                                    String?              @db.Uuid
-  spiritual_father_id                                     String?              @db.Uuid
-  spiritual_mother_id                                     String?              @db.Uuid
-  created_at                                              DateTime             @default(now()) @db.Timestamptz(6)
-  updated_at                                              DateTime             @default(now()) @db.Timestamptz(6)
-  created_by                                              String?              @db.Uuid
-  updated_by                                              String?              @db.Uuid
+  id                    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name_three_parts String       @db.VarChar(150)
+  email                 String       @unique(map: "idx_users_email") @db.VarChar(100)
+  password_hash         String       @db.VarChar(255)
+  university_id         String?      @unique @db.VarChar(50)
+  academic_dept         String?      @db.VarChar(100)
+  academic_year         Int?
+  dorm_block            String?      @db.VarChar(20)
+  dorm_room             String?      @db.VarChar(20)
+  phone_number          String?      @db.VarChar(20)
+  profile_image_url     String?      @default("/assets/avatar.png") @db.VarChar(255)
+  bio                   String?
+  sex                   Sex?
+  clerical_rank         ClericalRank @default(NONE)
+  system_role           system_role  @default(USER)
+  service_class_id      String?      @db.Uuid
+  pending_class_id      String?      @db.Uuid
+  repentance_father_id  String?      @db.Uuid
+  repentance_deacon_id  String?      @db.Uuid
+  spiritual_father_id   String?      @db.Uuid
+  spiritual_mother_id   String?      @db.Uuid
+  created_at            DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime     @default(now()) @db.Timestamptz(6)
+  created_by            String?      @db.Uuid
+  updated_by            String?      @db.Uuid
 
   // Member Affairs fields
-  verification_status                                     String?              @default("PENDING_REVIEW") @db.VarChar(20)
-  preferred_class_id                                      String?              @db.Uuid
-  rejection_reason                                        String?              @db.Text
-  approved_at                                             DateTime?            @db.Timestamptz(6)
-  approved_by                                             String?              @db.Uuid
-  is_active                                               Boolean              @default(true)
+  verification_status String?   @default("PENDING_REVIEW") @db.VarChar(20)
+  preferred_class_id  String?   @db.Uuid
+  rejection_reason    String?   @db.Text
+  approved_at         DateTime? @db.Timestamptz(6)
+  approved_by         String?   @db.Uuid
+  is_active           Boolean   @default(true)
 
   // Education: phases the member has graduated from
-  graduated_phases                                        Json?                @default("[]")
+  graduated_phases Json? @default("[]")
 
   // Relations
-  preferred_class                                         ServiceClass?        @relation("UserPreferredClass", fields: [preferred_class_id], references: [id])
-  approver                                                User?                @relation("UserApprover", fields: [approved_by], references: [id])
-  approved_users                                          User[]               @relation("UserApprover")
-  department_documents                                    DepartmentDocument[]
-  member_audit_logs                                       MembershipAuditLog[] @relation("auditLogMember")
-  performer_audit_logs                                    MembershipAuditLog[] @relation("auditLogPerformer")
-  sub_class_members                                       SubClassMember[]
+  preferred_class ServiceClass? @relation("UserPreferredClass", fields: [preferred_class_id], references: [id])
+  approver        User?         @relation("UserApprover", fields: [approved_by], references: [id])
+  approved_users  User[]        @relation("UserApprover")
+
+  // Document approval workflow relations
+  uploaded_documents DepartmentDocument[] @relation("DocumentUploader")
+  approved_documents DepartmentDocument[] @relation("DocumentApprover")
+  document_comments  DocumentComment[]
+  document_reactions DocumentReaction[]
+
+  member_audit_logs    MembershipAuditLog[] @relation("auditLogMember")
+  performer_audit_logs MembershipAuditLog[] @relation("auditLogPerformer")
+  sub_class_members    SubClassMember[]
 
   // Existing relations (unchanged)
   announcements                                           Announcement[]
@@ -81,8 +87,8 @@ model User {
   other_users_users_updated_byTousers                     User[]               @relation("users_updated_byTousers")
 
   // Sub-class approval requests
-  approval_requests_initiated                             SubClassApprovalRequest[] @relation("SubClassApprovalRequestedBy")
-  approval_requests_approved                              SubClassApprovalRequest[] @relation("SubClassApprovalApprovedBy")
+  approval_requests_initiated SubClassApprovalRequest[] @relation("SubClassApprovalRequestedBy")
+  approval_requests_approved  SubClassApprovalRequest[] @relation("SubClassApprovalApprovedBy")
 
   @@index([created_at], map: "idx_users_created_at")
   @@index([repentance_father_id], map: "idx_users_repentance_father_id")
@@ -95,15 +101,15 @@ model User {
 }
 
 model ServiceClass {
-  id                     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  class_name_amharic     String         @unique @db.VarChar(100)
-  is_public_registration Boolean        @default(true)
-  created_at             DateTime       @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime       @default(now()) @db.Timestamptz(6)
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  class_name_amharic     String               @unique @db.VarChar(100)
+  is_public_registration Boolean              @default(true)
+  created_at             DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime             @default(now()) @db.Timestamptz(6)
   announcements          Announcement[]
   sub_classes            sub_classes[]
   users                  User[]
-  preferred_users        User[]         @relation("UserPreferredClass")
+  preferred_users        User[]               @relation("UserPreferredClass")
   department_documents   DepartmentDocument[]
 
   @@map("service_classes")
@@ -265,8 +271,8 @@ model lms_enrollments {
   updated_at        DateTime         @default(now()) @db.Timestamptz(6)
   status            EnrollmentStatus @default(PENDING)
 
-  lms_batches       lms_batches      @relation(fields: [batch_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users             User             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lms_batches lms_batches @relation(fields: [batch_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       User        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([user_id, batch_id])
   @@index([batch_id], map: "idx_lms_enrollments_batch_id")
@@ -294,31 +300,87 @@ model SubClassMember {
   user_id      String   @db.Uuid
   assigned_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  sub_class    sub_classes @relation(fields: [sub_class_id], references: [id], onDelete: Cascade)
-  user         User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  sub_class sub_classes @relation(fields: [sub_class_id], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([sub_class_id, user_id])
   @@map("sub_class_members")
 }
 
 model DepartmentDocument {
-  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  service_class_id String        @db.Uuid
-  document_type    String        @db.VarChar(20)
-  title            String?       @db.VarChar(200)
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_class_id String   @db.Uuid
+  document_type    String   @db.VarChar(20)
+  title            String?  @db.VarChar(200)
   description      String?
-  drive_url        String        @db.VarChar(500)
+  drive_url        String   @db.VarChar(500)
   academic_year    Int?
   quarter          Int?
-  uploaded_by      String?       @db.Uuid
-  created_at       DateTime      @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime      @default(now()) @db.Timestamptz(6)
+  uploaded_by      String?  @db.Uuid
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
 
-  service_class    ServiceClass  @relation(fields: [service_class_id], references: [id], onDelete: Cascade)
-  uploader         User?         @relation(fields: [uploaded_by], references: [id])
+  status           DocumentStatus @default(PENDING)
+  approved_by      String?        @db.Uuid
+  approved_at      DateTime?      @db.Timestamptz(6)
+  rejection_reason String?        @db.Text
+
+  service_class ServiceClass       @relation(fields: [service_class_id], references: [id], onDelete: Cascade)
+  uploader      User?              @relation("DocumentUploader", fields: [uploaded_by], references: [id])
+  approver      User?              @relation("DocumentApprover", fields: [approved_by], references: [id])
+  comments      DocumentComment[]
+  reactions     DocumentReaction[]
 
   @@index([service_class_id, document_type])
+  @@index([status])
   @@map("department_documents")
+}
+
+// Add status enum for documents
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Add comment model for documents
+model DocumentComment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  document_id String   @db.Uuid
+  user_id     String   @db.Uuid
+  content     String
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  parent_id   String?  @db.Uuid // for nested comments (optional)
+
+  document DepartmentDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  parent   DocumentComment?   @relation("DocumentCommentToParent", fields: [parent_id], references: [id])
+  replies  DocumentComment[]  @relation("DocumentCommentToParent")
+
+  @@index([document_id, created_at])
+  @@map("document_comments")
+}
+
+// Add reaction model for documents
+model DocumentReaction {
+  id            String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  document_id   String                 @db.Uuid
+  user_id       String                 @db.Uuid
+  reaction_type document_reaction_type
+  created_at    DateTime               @default(now()) @db.Timestamptz(6)
+
+  document DepartmentDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([document_id, user_id])
+  @@index([document_id])
+  @@map("document_reactions")
+}
+
+enum document_reaction_type {
+  LIKE
+  STAR
 }
 
 model MembershipAuditLog {
@@ -330,8 +392,8 @@ model MembershipAuditLog {
   performed_by String?  @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz(6)
 
-  member       User @relation("auditLogMember", fields: [member_id], references: [id], onDelete: Cascade)
-  performer    User? @relation("auditLogPerformer", fields: [performed_by], references: [id])
+  member    User  @relation("auditLogMember", fields: [member_id], references: [id], onDelete: Cascade)
+  performer User? @relation("auditLogPerformer", fields: [performed_by], references: [id])
 
   @@index([member_id])
   @@index([created_at])
@@ -339,19 +401,19 @@ model MembershipAuditLog {
 }
 
 model sub_classes {
-  id                                        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  parent_class_id                           String       @db.Uuid
-  sub_class_name                            String       @db.VarChar(100)
-  sub_chair_id                              String?      @db.Uuid
-  sub_vice_id                               String?      @db.Uuid
-  sub_secretary_id                          String?      @db.Uuid
-  status                                    sub_class_status @default(PENDING_APPROVAL)
-  created_at                                DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at                                DateTime     @default(now()) @db.Timestamptz(6)
-  service_classes                           ServiceClass @relation(fields: [parent_class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users_sub_classes_sub_chair_idTousers     User?        @relation("sub_classes_sub_chair_idTousers", fields: [sub_chair_id], references: [id], onUpdate: NoAction)
-  users_sub_classes_sub_secretary_idTousers User?        @relation("sub_classes_sub_secretary_idTousers", fields: [sub_secretary_id], references: [id], onUpdate: NoAction)
-  users_sub_classes_sub_vice_idTousers      User?        @relation("sub_classes_sub_vice_idTousers", fields: [sub_vice_id], references: [id], onUpdate: NoAction)
+  id                                        String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parent_class_id                           String                    @db.Uuid
+  sub_class_name                            String                    @db.VarChar(100)
+  sub_chair_id                              String?                   @db.Uuid
+  sub_vice_id                               String?                   @db.Uuid
+  sub_secretary_id                          String?                   @db.Uuid
+  status                                    sub_class_status          @default(PENDING_APPROVAL)
+  created_at                                DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at                                DateTime                  @default(now()) @db.Timestamptz(6)
+  service_classes                           ServiceClass              @relation(fields: [parent_class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_sub_classes_sub_chair_idTousers     User?                     @relation("sub_classes_sub_chair_idTousers", fields: [sub_chair_id], references: [id], onUpdate: NoAction)
+  users_sub_classes_sub_secretary_idTousers User?                     @relation("sub_classes_sub_secretary_idTousers", fields: [sub_secretary_id], references: [id], onUpdate: NoAction)
+  users_sub_classes_sub_vice_idTousers      User?                     @relation("sub_classes_sub_vice_idTousers", fields: [sub_vice_id], references: [id], onUpdate: NoAction)
   members                                   SubClassMember[]
   approval_requests                         SubClassApprovalRequest[]
 }
@@ -441,37 +503,38 @@ model Subject {
   lessons     Lesson[]
   exam        Exam?
 
-  batch       lms_batches @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batch lms_batches @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@map("subjects")
 }
 
 model Lesson {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  subjectId   String   @db.Uuid
-  title       String
-  content     String   // HTML
-  order       Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectId String   @db.Uuid
+  title     String
+  content   String // HTML
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   @@map("lessons")
 }
+
 model InlineExplanation {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  lessonId    String   // no @db.Uuid, no relation
+  lessonId    String // no @db.Uuid, no relation
   quotedText  String
   explanation String
   createdAt   DateTime @default(now())
 
-  @@map("inline_explanations")   // ← ADD THIS LINE
+  @@map("inline_explanations") // ← ADD THIS LINE
 }
 
 model Exam {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  subjectId    String?  @unique @db.Uuid   // each subject has at most one exam
+  subjectId    String?  @unique @db.Uuid // each subject has at most one exam
   batchId      String   @db.Uuid
   title        String
   description  String?
@@ -481,30 +544,30 @@ model Exam {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  subject      Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
-  batch        lms_batches @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  subject Subject?    @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  batch   lms_batches @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@map("exams")
 }
 
 // Sub-Class Approval Request tracking
 model SubClassApprovalRequest {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sub_class_id      String    @db.Uuid
-  request_type      String    @db.VarChar(50)  // 'CREATE' | 'ADD_LEADER' | 'UPDATE'
-  requested_by_id   String    @db.Uuid
-  requested_at      DateTime  @default(now()) @db.Timestamptz(6)
-  status            String    @default("PENDING") @db.VarChar(20)  // 'PENDING' | 'APPROVED' | 'REJECTED'
-  approved_by_id    String?   @db.Uuid
-  approved_at       DateTime? @db.Timestamptz(6)
-  rejection_reason  String?
-  request_data      Json      // stores the requested changes
-  created_at        DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sub_class_id     String    @db.Uuid
+  request_type     String    @db.VarChar(50) // 'CREATE' | 'ADD_LEADER' | 'UPDATE'
+  requested_by_id  String    @db.Uuid
+  requested_at     DateTime  @default(now()) @db.Timestamptz(6)
+  status           String    @default("PENDING") @db.VarChar(20) // 'PENDING' | 'APPROVED' | 'REJECTED'
+  approved_by_id   String?   @db.Uuid
+  approved_at      DateTime? @db.Timestamptz(6)
+  rejection_reason String?
+  request_data     Json // stores the requested changes
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
 
-  requested_by      User      @relation("SubClassApprovalRequestedBy", fields: [requested_by_id], references: [id], onDelete: Cascade)
-  approved_by       User?     @relation("SubClassApprovalApprovedBy", fields: [approved_by_id], references: [id], onDelete: SetNull)
-  sub_classes       sub_classes @relation(fields: [sub_class_id], references: [id], onDelete: Cascade)
+  requested_by User        @relation("SubClassApprovalRequestedBy", fields: [requested_by_id], references: [id], onDelete: Cascade)
+  approved_by  User?       @relation("SubClassApprovalApprovedBy", fields: [approved_by_id], references: [id], onDelete: SetNull)
+  sub_classes  sub_classes @relation(fields: [sub_class_id], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([sub_class_id])
