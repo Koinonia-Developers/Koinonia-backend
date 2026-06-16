@@ -1,56 +1,57 @@
+// src/modules/announcements/announcements.routes.ts
 import { Router } from 'express';
 import { announcementsController } from './announcements.controller';
-import { requireAuth, requireRole, requireActiveStatus } from '../../middleware/auth';
+import { requireAuth, requireActiveStatus } from '../../middleware/auth';
+import { requireSecretariat } from '../../middleware/requireSecretariat';
 import { validate } from '../../middleware/validate';
-import { createAnnouncementSchema } from './announcements.schema';
+import { createAnnouncementSchema, resubmitAnnouncementSchema, rejectAnnouncementSchema } from './announcements.schema';
 
 const router = Router();
 
-// GET /announcements — requires auth (any active user can read)
+// Public (authenticated) routes
 router.get('/', requireAuth, requireActiveStatus, announcementsController.getAnnouncements);
+router.post('/:id/reactions', requireAuth, requireActiveStatus, announcementsController.reactToAnnouncement);
+router.post('/:id/comments', requireAuth, requireActiveStatus, announcementsController.commentOnAnnouncement);
 
-// POST /announcements — Secretariats only
+// Comment edit and delete (creator only)
+router.patch('/:id/comments/:commentId', requireAuth, requireActiveStatus, announcementsController.editComment);
+router.delete('/:id/comments/:commentId', requireAuth, requireActiveStatus, announcementsController.deleteComment);
+
+// My announcements (for current user)
+router.get('/my', requireAuth, requireActiveStatus, announcementsController.getUserAnnouncements);
+
+// Resubmit a rejected announcement (creator only)
+router.patch(
+    '/:id/resubmit',
+    requireAuth,
+    requireActiveStatus,
+    validate(resubmitAnnouncementSchema),
+    announcementsController.resubmitAnnouncement
+);
+
+// Secretariat-only routes
+router.get('/pending', requireAuth, requireActiveStatus, requireSecretariat, announcementsController.getPendingAnnouncements);
+router.patch('/:id/approve', requireAuth, requireActiveStatus, requireSecretariat, announcementsController.approveAnnouncement);
+router.patch(
+    '/:id/reject',
+    requireAuth,
+    requireActiveStatus,
+    requireSecretariat,
+    validate(rejectAnnouncementSchema),
+    announcementsController.rejectAnnouncement
+);
+
+// Create announcement – allowed for secretariat AND service managers
 router.post(
     '/',
     requireAuth,
     requireActiveStatus,
-    requireRole(['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SUPER_ADMIN']),
     validate(createAnnouncementSchema),
     announcementsController.createAnnouncement
 );
 
-// POST /announcements/:id/reactions
-router.post(
-    '/:id/reactions',
-    requireAuth,
-    requireActiveStatus,
-    announcementsController.reactToAnnouncement
-);
-
-// POST /announcements/:id/comments
-router.post(
-    '/:id/comments',
-    requireAuth,
-    requireActiveStatus,
-    announcementsController.commentOnAnnouncement
-);
-
-// PATCH /announcements/:id — SECRETARIAT_CHAIRMAN only
-router.patch(
-    '/:id',
-    requireAuth,
-    requireActiveStatus,
-    requireRole(['SECRETARIAT_CHAIRMAN', 'SUPER_ADMIN']),
-    announcementsController.updateAnnouncement
-);
-
-// DELETE /announcements/:id — SECRETARIAT_CHAIRMAN only
-router.delete(
-    '/:id',
-    requireAuth,
-    requireActiveStatus,
-    requireRole(['SECRETARIAT_CHAIRMAN', 'SUPER_ADMIN']),
-    announcementsController.deleteAnnouncement
-);
+// Update and delete – only chairman
+router.patch('/:id', requireAuth, requireActiveStatus, announcementsController.updateAnnouncement);
+router.delete('/:id', requireAuth, requireActiveStatus, announcementsController.deleteAnnouncement);
 
 export default router;

@@ -1,3 +1,4 @@
+// src/modules/auth/auth.schema.ts
 import { z } from 'zod';
 
 export const registerSchema = z.object({
@@ -9,6 +10,12 @@ export const registerSchema = z.object({
         clerical_rank: z.enum(["NONE", "DEACON", "PRIEST", "LECTOR", "OTHER"]).optional(),
         phone_number: z.string().optional(),
         profile_image_url: z.string().optional(),
+        // Academic & Residence fields
+        service_class_id: z.string().optional(),
+        academic_dept: z.string().optional(),
+        academic_year: z.number().int().optional(),
+        dorm_block: z.string().optional(),
+        dorm_room: z.string().optional(),
     })
 });
 

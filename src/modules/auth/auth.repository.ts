@@ -1,21 +1,25 @@
+// src/modules/auth/auth.repository.ts
 import { db } from '../../config/db';
 import { User } from '@prisma/client';
 import { RegisterInput } from './auth.schema';
 
-interface CreateUserData extends Omit<RegisterInput, 'password'> {
+interface CreateUserData {
+    full_name_three_parts: string;
+    email: string;
     passwordHash: string;
+    sex?: "MALE" | "FEMALE";
+    clerical_rank?: "NONE" | "DEACON" | "PRIEST" | "LECTOR" | "OTHER";
+    phone_number?: string;
+    profile_image_url?: string;
+    service_class_id?: string;
+    academic_dept?: string;
+    academic_year?: number;
+    dorm_block?: string;
+    dorm_room?: string;
 }
 
 export class AuthRepository {
-    async createUser(data: { 
-        full_name_three_parts: string; 
-        email: string; 
-        passwordHash: string;
-        sex?: "MALE" | "FEMALE";
-        clerical_rank?: "NONE" | "DEACON" | "PRIEST" | "LECTOR" | "OTHER";
-        phone_number?: string;
-        profile_image_url?: string;
-    }): Promise<User> {
+    async createUser(data: CreateUserData): Promise<User> {
         return db.user.create({
             data: {
                 full_name_three_parts: data.full_name_three_parts,
@@ -26,6 +30,11 @@ export class AuthRepository {
                 clerical_rank: data.clerical_rank || 'NONE',
                 phone_number: data.phone_number,
                 profile_image_url: data.profile_image_url,
+                service_class_id: data.service_class_id,
+                academic_dept: data.academic_dept,
+                academic_year: data.academic_year,
+                dorm_block: data.dorm_block,
+                dorm_room: data.dorm_room,
             },
         });
     }

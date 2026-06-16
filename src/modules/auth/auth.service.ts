@@ -4,11 +4,10 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { authRepository } from './auth.repository';
 import { RegisterInput, LoginInput } from './auth.schema';
-import { ConflictError, UnauthorizedError, ForbiddenError } from '../../utils/errors';
+import { ConflictError, UnauthorizedError } from '../../utils/errors';
 
 const SALT_ROUNDS = 12;
 
-// ✅ generateToken includes serviceClassName
 const generateToken = (user: {
     id: string;
     system_role: string;
@@ -42,9 +41,13 @@ export class AuthService {
             clerical_rank: data.clerical_rank || 'NONE',
             phone_number: data.phone_number,
             profile_image_url: data.profile_image_url,
+            service_class_id: data.service_class_id,
+            academic_dept: data.academic_dept,
+            academic_year: data.academic_year,
+            dorm_block: data.dorm_block,
+            dorm_room: data.dorm_room,
         });
 
-        // Fetch again to get service class relation (since createUser doesn't include it)
         const userWithClass = await authRepository.findById(user.id);
         const serviceClassName = userWithClass?.service_classes?.class_name_amharic;
 
@@ -60,14 +63,10 @@ export class AuthService {
     }
 
     async login(data: LoginInput) {
-        console.log('Login attempt with email:', data.email);
-        // ✅ findByEmail already includes service_classes
         const user = await authRepository.findByEmail(data.email);
-        console.log('User found:', !!user, user?.email);
         if (!user) throw new UnauthorizedError('Invalid email or password');
 
         const isPasswordValid = await bcrypt.compare(data.password, user.password_hash);
-        console.log('Password valid:', isPasswordValid);
         if (!isPasswordValid) throw new UnauthorizedError('Invalid email or password');
 
         const serviceClassName = user.service_classes?.class_name_amharic;
@@ -83,7 +82,6 @@ export class AuthService {
     }
 
     async getUserById(id: string) {
-        // ✅ findById already includes service_classes
         const user = await authRepository.findById(id);
         if (!user) return null;
         const serviceClassName = user.service_classes?.class_name_amharic;
@@ -94,7 +92,6 @@ export class AuthService {
     async updateProfile(id: string, data: any) {
         const user = await authRepository.updateProfile(id, data);
         if (!user) return null;
-        // updateProfile already includes service_classes in the returned user
         const serviceClassName = user.service_classes?.class_name_amharic;
         const { password_hash: _, ...userWithoutPassword } = user as any;
         return { ...userWithoutPassword, serviceClassName };

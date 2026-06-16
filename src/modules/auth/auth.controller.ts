@@ -1,3 +1,4 @@
+// src/modules/auth/auth.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { authService } from './auth.service';
 
