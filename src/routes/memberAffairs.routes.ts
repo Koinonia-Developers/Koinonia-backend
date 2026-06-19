@@ -1,7 +1,7 @@
+// src/routes/memberAffairs.routes.ts
 import { Router } from 'express';
 import { MemberAffairsController } from '../modules/member-affairs/member-affairs.controller';
-import { requireAuth } from '../middleware/auth';
-import { requireRole } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { requireServiceClassAccess, requireSubClassApproval } from '../middleware/serviceClassGuard';
 import { requireMemberAffairsAccess } from '../middleware/memberAffairsGuard';
 import { requireSecretariat } from '../middleware/requireSecretariat';
@@ -42,12 +42,15 @@ router.post('/sub-classes/:subClassId/members', requireServiceClassAccess, valid
 router.delete('/sub-classes/:subClassId/members/:userId', requireServiceClassAccess, controller.removeMemberFromSubClass);
 router.delete('/sub-classes/:subClassId', requireAuth, controller.deleteSubClass);
 
-// ============ DOCUMENTS (for service managers, with service class) ============
-router.get('/documents/:serviceClassId/:type', requireMemberAffairsAccess, controller.listDocuments);
-router.post('/documents/:serviceClassId', requireMemberAffairsAccess, controller.uploadDocument);
-router.delete('/documents/:id', requireMemberAffairsAccess, controller.deleteDocument);
+// ============ DOCUMENTS ============
+// ✅ GET: Any authenticated user can list documents (service handles class filtering)
+// ✅ POST: Only a manager of the class can upload (enforced by requireServiceClassAccess)
+router.get('/documents/:serviceClassId/:type', requireAuth, controller.listDocuments);
+router.post('/documents/:serviceClassId', requireServiceClassAccess, controller.uploadDocument);
+router.patch('/documents/:id', requireAuth, controller.updateDocument);
+router.delete('/documents/:id', requireAuth, controller.deleteDocument);
 
-// ============ DOCUMENT APPROVAL, COMMENTS, REACTIONS (shared) ============
+// ============ DOCUMENT APPROVAL, COMMENTS, REACTIONS ============
 router.get('/documents/:id', requireAuth, controller.getDocument);
 router.post('/documents/:id/approve', requireAuth, requireRole(['SECRETARIAT_CHAIRMAN']), controller.approveDocument);
 router.post('/documents/:id/reject', requireAuth, requireRole(['SECRETARIAT_CHAIRMAN']), controller.rejectDocument);

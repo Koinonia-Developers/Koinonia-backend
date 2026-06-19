@@ -1,3 +1,4 @@
+//src/modules/notifications/notifications.repository.ts
 import { db } from '../../config/db';
 
 export class NotificationsRepository {

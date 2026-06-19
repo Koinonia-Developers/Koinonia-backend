@@ -1,3 +1,4 @@
+// src/modules/member-affairs/member-affairs.controller.ts
 import { Request, Response } from 'express';
 import { memberAffairsService } from './member-affairs.service';
 
@@ -169,12 +170,14 @@ export class MemberAffairsController {
     res.json(docs);
   }
 
-  async deleteDocument(req: Request, res: Response) {
-    const id = getStringParam(req.params.id);
-    const result = await memberAffairsService.deleteDocument(id);
-    res.json(result);
-  }
-
+ async deleteDocument(req: Request, res: Response) {
+  const id = getStringParam(req.params.id);
+  const userId = req.user?.userID;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const userRole = req.user?.role || (req.user as any).system_role || '';
+  const result = await memberAffairsService.deleteDocument(id, userId, userRole);
+  res.json(result);
+}
   async getDocument(req: Request, res: Response) {
     const id = getStringParam(req.params.id);
     const userId = req.user?.userID || '';
@@ -248,17 +251,18 @@ export class MemberAffairsController {
     }
   }
 
-  async notifyDocumentApproved(req: Request, res: Response) {
-    const { documentTitle } = req.body;
-    if (!documentTitle) return res.status(400).json({ error: 'documentTitle is required' });
-    try {
-      await memberAffairsService.notifyDocumentApproved(documentTitle);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+async notifyDocumentApproved(req: Request, res: Response) {
+  const { documentId, excludeUserId } = req.body;
+  if (!documentId) {
+    return res.status(400).json({ error: 'documentId is required' });
   }
-
+  try {
+    await memberAffairsService.notifyDocumentApproved(documentId, excludeUserId);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+}
   async notifyDocumentRejected(req: Request, res: Response) {
     const { userId, documentTitle, reason } = req.body;
     if (!userId || !documentTitle) {
@@ -297,4 +301,20 @@ export class MemberAffairsController {
       res.status(400).json({ error: error.message });
     }
   }
+  // ============ UPDATE DOCUMENT ============
+async updateDocument(req: Request, res: Response) {
+  const id = getStringParam(req.params.id);
+  const userId = req.user?.userID;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const userRole = req.user?.role || (req.user as any).system_role || '';
+  
+  const { title, description, drive_url, status } = req.body;
+  const result = await memberAffairsService.updateDocument(id, userId, userRole, {
+    title,
+    description,
+    drive_url,
+    status,
+  });
+  res.json(result);
+}
 }

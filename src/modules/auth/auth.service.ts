@@ -1,11 +1,14 @@
 // src/modules/auth/auth.service.ts
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
 import { env } from '../../config/env';
 import { authRepository } from './auth.repository';
 import { RegisterInput, LoginInput } from './auth.schema';
 import { ConflictError, UnauthorizedError } from '../../utils/errors';
+import { notificationsRepository } from '../notifications/notifications.repository';
 
+const prisma = new PrismaClient();
 const SALT_ROUNDS = 12;
 
 const generateToken = (user: {
@@ -47,6 +50,35 @@ export class AuthService {
             dorm_block: data.dorm_block,
             dorm_room: data.dorm_room,
         });
+
+        // ─── NOTIFY MEMBER AFFAIRS MANAGERS ABOUT NEW PENDING USER ───
+        try {
+            // Find the Member Affairs service class
+            const memberAffairsClass = await prisma.serviceClass.findFirst({
+                where: { class_name_amharic: 'የአባልነት ጉዳይ ክፍል' }
+            });
+            if (memberAffairsClass) {
+                const managers = await prisma.user.findMany({
+                    where: {
+                        system_role: 'SERVICE_MANAGER',
+                        service_class_id: memberAffairsClass.id,
+                    },
+                    select: { id: true }
+                });
+                if (managers.length > 0) {
+                    await notificationsRepository.spawnBulkNotifications(managers.map((m: any) => m.id), {
+                        actorID: user.id,
+                        type: 'MEMBERSHIP',
+                        content: `New member registration: ${user.full_name_three_parts} needs approval.`,
+                        linkTarget: '/dashboard/member-affairs?tab=pending',
+                        notificationType: 'MEMBERSHIP',
+                        relatedEntityId: user.id
+                    });
+                }
+            }
+        } catch (notifError) {
+            console.error('Failed to notify Member Affairs managers:', notifError);
+        }
 
         const userWithClass = await authRepository.findById(user.id);
         const serviceClassName = userWithClass?.service_classes?.class_name_amharic;

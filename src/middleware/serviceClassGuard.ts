@@ -1,3 +1,4 @@
+//src/middleware/serviceClassGuard.ts
 import { Request, Response, NextFunction } from 'express';
 import { ForbiddenError } from '../utils/errors';
 import { PrismaClient } from '@prisma/client';

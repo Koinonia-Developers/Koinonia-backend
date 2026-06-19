@@ -1,6 +1,8 @@
+// src/modules/member-affairs/member-affairs.controller.ts
 import { PrismaClient } from '@prisma/client';
 import { BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError } from '../../utils/errors';
 import { approvalService } from '../approvals/approval.service';
+import { notificationsRepository } from '../notifications/notifications.repository';
 
 const prisma = new PrismaClient();
 
@@ -45,6 +47,43 @@ export class MemberAffairsService {
         performed_by: adminId,
       },
     });
+
+    // ─── NOTIFICATIONS ───
+    try {
+      await notificationsRepository.spawnNotification({
+        userID: userId,
+        actorID: adminId,
+        type: 'MEMBERSHIP',
+        content: `Your membership has been approved! Welcome to the Enda Eyesus fellowship.`,
+        linkTarget: '/dashboard/profile',
+        notificationType: 'MEMBERSHIP',
+        relatedEntityId: userId,
+      });
+
+      const assignedClass = await prisma.serviceClass.findUnique({
+        where: { id: finalClassId },
+        include: {
+          users: {
+            where: { system_role: 'SERVICE_MANAGER' },
+            select: { id: true },
+          },
+        },
+      });
+      if (assignedClass && assignedClass.users.length > 0) {
+        const managerIds = assignedClass.users.map(u => u.id);
+        await notificationsRepository.spawnBulkNotifications(managerIds, {
+          actorID: adminId,
+          type: 'MEMBERSHIP',
+          content: `A new member (${user.full_name_three_parts}) has been assigned to your class: ${assignedClass.class_name_amharic}.`,
+          linkTarget: `/dashboard/member-affairs?tab=census&class=${assignedClass.id}`,
+          notificationType: 'MEMBERSHIP',
+          relatedEntityId: userId,
+        });
+      }
+    } catch (notifError) {
+      console.error('Failed to send approval notifications:', notifError);
+    }
+
     return updated;
   }
 
@@ -61,6 +100,21 @@ export class MemberAffairsService {
         new_value: { status: 'REJECTED', reason },
       },
     });
+
+    try {
+      await notificationsRepository.spawnNotification({
+        userID: userId,
+        actorID: userId,
+        type: 'MEMBERSHIP',
+        content: `Your membership application was not approved. Reason: ${reason || 'No reason provided'}. Please contact the Member Affairs office for more details.`,
+        linkTarget: '/dashboard',
+        notificationType: 'MEMBERSHIP',
+        relatedEntityId: userId,
+      });
+    } catch (notifError) {
+      console.error('Failed to send rejection notification:', notifError);
+    }
+
     return updated;
   }
 
@@ -403,22 +457,18 @@ export class MemberAffairsService {
     
     let finalServiceClassId: string;
     
-    // If service class is provided, use it
     if (serviceClassId && serviceClassId !== '') {
       finalServiceClassId = serviceClassId;
     } else if (isSecretariat) {
-      // For secretariat users without a service class, try to use or create "General Assembly" class
       let defaultClass = await prisma.serviceClass.findFirst({
         where: { class_name_amharic: 'General Assembly' },
       });
       
-      // If it doesn't exist, try to get the first available class, or create General Assembly
       if (!defaultClass) {
         defaultClass = await prisma.serviceClass.findFirst({
           orderBy: { created_at: 'asc' },
         });
         
-        // If no classes exist at all, create General Assembly
         if (!defaultClass) {
           defaultClass = await prisma.serviceClass.create({
             data: {
@@ -431,11 +481,10 @@ export class MemberAffairsService {
       
       finalServiceClassId = defaultClass.id;
     } else {
-      // For non-secretariat users, service class is required
       throw new BadRequestError('Service class ID is required for non-secretariat users');
     }
     
-    return prisma.departmentDocument.create({
+    const doc = await prisma.departmentDocument.create({
       data: {
         service_class_id: finalServiceClassId,
         document_type: data.document_type,
@@ -447,50 +496,66 @@ export class MemberAffairsService {
         uploaded_by: uploadedBy,
         status: isSecretariat ? 'APPROVED' : 'PENDING',
       },
+      include: { uploader: { select: { full_name_three_parts: true } } },
     });
+
+    if (isSecretariat) {
+      // Notify everyone except the uploader
+      this.notifyDocumentApproved(doc.id, uploadedBy).catch(err => console.error('Failed to notify:', err));
+    }
+
+    return doc;
   }
 
-  async listDocuments(serviceClassId: string | null, type: 'PLAN' | 'REPORT', userId: string, userRole: string) {
-    const isSecretariat = ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SUPER_ADMIN'].includes(userRole);
-    const isChairman = userRole === 'SECRETARIAT_CHAIRMAN';
-    const where: any = { document_type: type };
-    if (isChairman) {
-      // no filter
-    } else if (isSecretariat) {
-      // no filter
-    } else {
-      where.status = 'APPROVED';
-      if (serviceClassId) where.service_class_id = serviceClassId;
-      else return [];
-    }
-    const docs = await prisma.departmentDocument.findMany({
-      where,
+async listDocuments(serviceClassId: string | null, type: 'PLAN' | 'REPORT', userId: string, userRole: string) {
+  const isSecretariat = ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY', 'SUPER_ADMIN'].includes(userRole);
+  const isChairman = userRole === 'SECRETARIAT_CHAIRMAN';
+
+  let where: any = { document_type: type };
+
+  if (isChairman || isSecretariat) {
+    // Secretariat sees all documents (no filters)
+  } else {
+    // Service manager: see ALL APPROVED documents (cross‑class) + their own PENDING
+    where.status = 'APPROVED';
+    // ❌ Remove class filter – we want to see all approved docs, not just own class
+    // if (serviceClassId) where.service_class_id = serviceClassId; // <-- REMOVE this
+  }
+
+  const docs = await prisma.departmentDocument.findMany({
+    where,
+    include: {
+      uploader: { select: { full_name_three_parts: true, email: true } },
+      approver: { select: { full_name_three_parts: true } },
+      comments: { include: { user: { select: { full_name_three_parts: true, profile_image_url: true } } }, orderBy: { created_at: 'asc' } },
+      reactions: true,
+      service_class: { select: { class_name_amharic: true } },
+    },
+    orderBy: { created_at: 'desc' },
+  });
+
+  // If service manager, also add their own pending documents (regardless of class)
+  if (!isChairman && !isSecretariat) {
+    const userPending = await prisma.departmentDocument.findMany({
+      where: {
+        document_type: type,
+        status: 'PENDING',
+        uploaded_by: userId,
+        // No class filter – include pending docs from any class
+      },
       include: {
         uploader: { select: { full_name_three_parts: true, email: true } },
         approver: { select: { full_name_three_parts: true } },
         comments: { include: { user: { select: { full_name_three_parts: true, profile_image_url: true } } }, orderBy: { created_at: 'asc' } },
         reactions: true,
+        service_class: { select: { class_name_amharic: true } },
       },
-      orderBy: { created_at: 'desc' },
     });
-    if (!isChairman && !isSecretariat && serviceClassId) {
-      const userPending = await prisma.departmentDocument.findMany({
-        where: {
-          service_class_id: serviceClassId,
-          document_type: type,
-          status: 'PENDING',
-          uploaded_by: userId,
-        },
-        include: { uploader: true, approver: true, comments: { include: { user: true } }, reactions: true },
-      });
-      return [...userPending, ...docs];
-    }
-    return docs;
+    return [...userPending, ...docs];
   }
 
-  async deleteDocument(documentId: string) {
-    return prisma.departmentDocument.delete({ where: { id: documentId } });
-  }
+  return docs;
+}
 
   async getDocumentById(documentId: string, userId: string, userRole: string) {
     const doc = await prisma.departmentDocument.findUnique({
@@ -500,6 +565,7 @@ export class MemberAffairsService {
         approver: { select: { full_name_three_parts: true } },
         comments: { include: { user: { select: { full_name_three_parts: true, profile_image_url: true } } }, orderBy: { created_at: 'asc' } },
         reactions: true,
+        service_class: { select: { class_name_amharic: true } },
       },
     });
     if (!doc) throw new NotFoundError('Document not found');
@@ -512,25 +578,24 @@ export class MemberAffairsService {
   }
 
   async approveDocument(documentId: string, approvedBy: string) {
-    const doc = await prisma.departmentDocument.findUnique({ where: { id: documentId } });
+    const doc = await prisma.departmentDocument.findUnique({
+      where: { id: documentId },
+      include: { uploader: { select: { full_name_three_parts: true } } },
+    });
     if (!doc) throw new NotFoundError('Document not found');
     if (doc.status !== 'PENDING') throw new BadRequestError('Document is not pending approval');
+
     const updated = await prisma.departmentDocument.update({
       where: { id: documentId },
       data: { status: 'APPROVED', approved_by: approvedBy, approved_at: new Date() },
     });
-    if (doc.uploaded_by) {
-      await prisma.notification.create({
-        data: {
-          user_id: doc.uploaded_by,
-          title: 'Document Approved ✓',
-          message: `Your document "${doc.title}" has been approved and is now visible to all authorized members.`,
-          target_route: `/dashboard/member-affairs?tab=documents&type=${doc.document_type.toLowerCase()}`,
-          type: 'DOCUMENT_APPROVAL',
-          related_entity_id: documentId,
-        },
-      });
+
+    try {
+      await this.notifyDocumentApproved(documentId, approvedBy);
+    } catch (notifError) {
+      console.error('Failed to send approval notifications:', notifError);
     }
+
     return updated;
   }
 
@@ -557,6 +622,7 @@ export class MemberAffairsService {
     return updated;
   }
 
+  // ============ COMMENTS ============
   async addComment(documentId: string, userId: string, content: string, parentId?: string) {
     const doc = await prisma.departmentDocument.findUnique({ where: { id: documentId } });
     if (!doc) throw new NotFoundError('Document not found');
@@ -573,7 +639,10 @@ export class MemberAffairsService {
   }
 
   async deleteComment(commentId: string, userId: string) {
-    const comment = await prisma.documentComment.findUnique({ where: { id: commentId }, include: { document: true } });
+    const comment = await prisma.documentComment.findUnique({
+      where: { id: commentId },
+      include: { document: true },
+    });
     if (!comment) throw new NotFoundError('Comment not found');
     const user = await prisma.user.findUnique({ where: { id: userId } });
     const isChairman = user?.system_role === 'SECRETARIAT_CHAIRMAN';
@@ -582,6 +651,7 @@ export class MemberAffairsService {
     return prisma.documentComment.delete({ where: { id: commentId } });
   }
 
+  // ============ REACTIONS ============
   async addReaction(documentId: string, userId: string, reactionType: 'LIKE' | 'STAR') {
     const doc = await prisma.departmentDocument.findUnique({ where: { id: documentId } });
     if (!doc) throw new NotFoundError('Document not found');
@@ -604,16 +674,61 @@ export class MemberAffairsService {
     });
   }
 
-  // -------------------- NOTIFICATIONS --------------------
+  // ============ NOTIFICATION HELPERS ============
+  public async notifyDocumentApproved(documentId: string, excludeUserId: string) {
+    const doc = await prisma.departmentDocument.findUnique({
+      where: { id: documentId },
+      include: { uploader: { select: { full_name_three_parts: true } } },
+    });
+    if (!doc) return;
+
+    const recipients: string[] = [];
+
+    // 1. Service managers of this class
+    const managers = await prisma.user.findMany({
+      where: {
+        system_role: 'SERVICE_MANAGER',
+        service_class_id: doc.service_class_id,
+      },
+      select: { id: true },
+    });
+    recipients.push(...managers.map(m => m.id));
+
+    // 2. All secretariat members
+    const secretariat = await prisma.user.findMany({
+      where: {
+        system_role: { in: ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY'] },
+      },
+      select: { id: true },
+    });
+    recipients.push(...secretariat.map(s => s.id));
+
+    const uniqueRecipients = [...new Set(recipients)].filter(id => id !== excludeUserId);
+
+    if (uniqueRecipients.length === 0) return;
+
+    await prisma.$transaction(
+      uniqueRecipients.map(userId =>
+        prisma.notification.create({
+          data: {
+            user_id: userId,
+            title: 'New Document Added 📄',
+            message: `New file added by ${doc.uploader?.full_name_three_parts || 'Unknown'}: "${doc.title}"`,
+            target_route: `/dashboard/member-affairs?tab=documents&type=${doc.document_type.toLowerCase()}`,
+            type: 'DOCUMENT_APPROVED',
+            related_entity_id: documentId,
+          },
+        })
+      )
+    );
+  }
+
   async notifyChairmanOfPendingDocument(uploadedById: string) {
     try {
-      // Find all SECRETARIAT_CHAIRMAN users
       const chairmen = await prisma.user.findMany({
         where: { system_role: 'SECRETARIAT_CHAIRMAN' },
         select: { id: true },
       });
-
-      // Create notifications for each chairman
       for (const chairman of chairmen) {
         await prisma.notification.create({
           data: {
@@ -630,38 +745,8 @@ export class MemberAffairsService {
     }
   }
 
-  async notifyDocumentApproved(documentTitle: string) {
-    try {
-      // Find all service managers and secretariat users
-      const recipients = await prisma.user.findMany({
-        where: {
-          system_role: {
-            in: ['SECRETARIAT_CHAIRMAN', 'SECRETARIAT_VICE', 'SECRETARIAT_SECRETARY'],
-          },
-        },
-        select: { id: true },
-      });
-
-      // Create notifications for each recipient
-      for (const recipient of recipients) {
-        await prisma.notification.create({
-          data: {
-            user_id: recipient.id,
-            title: 'Document Approved',
-            message: `"${documentTitle}" has been approved and is now visible to all members`,
-            type: 'DOCUMENT_APPROVED',
-            target_route: '/dashboard/member-affairs?tab=documents',
-          },
-        });
-      }
-    } catch (error) {
-      console.error('Error notifying document approval:', error);
-    }
-  }
-
   async notifyDocumentRejected(userId: string, documentTitle: string, reason: string) {
     try {
-      // Notify only the document creator
       await prisma.notification.create({
         data: {
           user_id: userId,
@@ -678,7 +763,6 @@ export class MemberAffairsService {
 
   async notifyCommentAdded(userId: string, documentTitle: string) {
     try {
-      // Notify the document creator about the comment
       await prisma.notification.create({
         data: {
           user_id: userId,
@@ -695,7 +779,6 @@ export class MemberAffairsService {
 
   async notifyReactionAdded(userId: string, documentTitle: string) {
     try {
-      // Notify the document creator about the reaction
       await prisma.notification.create({
         data: {
           user_id: userId,
@@ -709,6 +792,84 @@ export class MemberAffairsService {
       console.error('Error notifying reaction:', error);
     }
   }
+  // ============ UPDATE DOCUMENT ============
+async updateDocument(
+  documentId: string,
+  userId: string,
+  userRole: string,
+  data: {
+    title?: string;
+    description?: string;
+    drive_url?: string;
+    status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  }
+) {
+  const doc = await prisma.departmentDocument.findUnique({ where: { id: documentId } });
+  if (!doc) throw new NotFoundError('Document not found');
+
+  const isChairman = userRole === 'SECRETARIAT_CHAIRMAN';
+  const isUploader = doc.uploaded_by === userId;
+
+  // Permission check
+  if (!isChairman && !isUploader) {
+    throw new ForbiddenError('You do not have permission to edit this document');
+  }
+
+  // Uploader can only edit title, description, drive_url – NOT status
+  if (!isChairman && (data.status !== undefined)) {
+    throw new ForbiddenError('Only the chairman can change document status');
+  }
+
+  const updateData: any = {};
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.drive_url !== undefined) updateData.drive_url = data.drive_url;
+
+  // Chairman can update status and set approval fields if status changes
+  if (isChairman && data.status !== undefined) {
+    updateData.status = data.status;
+    if (data.status === 'APPROVED') {
+      updateData.approved_by = userId;
+      updateData.approved_at = new Date();
+    } else if (data.status === 'REJECTED') {
+      // Optionally set rejection reason; we'll keep it simple
+      // Could add rejection_reason in data if needed
+    }
+  }
+
+  const updated = await prisma.departmentDocument.update({
+    where: { id: documentId },
+    data: updateData,
+    include: {
+      uploader: { select: { full_name_three_parts: true, email: true } },
+      approver: { select: { full_name_three_parts: true } },
+      service_class: { select: { class_name_amharic: true } },
+    },
+  });
+
+  // If status changed to APPROVED by chairman, send notifications
+  if (isChairman && data.status === 'APPROVED' && doc.status !== 'APPROVED') {
+    // Notify all managers except the chairman (the approver)
+    this.notifyDocumentApproved(documentId, userId).catch(err => console.error('Failed to notify:', err));
+  }
+
+  return updated;
+}
+
+// Modify deleteDocument to check permissions
+async deleteDocument(documentId: string, userId: string, userRole: string) {
+  const doc = await prisma.departmentDocument.findUnique({ where: { id: documentId } });
+  if (!doc) throw new NotFoundError('Document not found');
+
+  const isChairman = userRole === 'SECRETARIAT_CHAIRMAN';
+  const isUploader = doc.uploaded_by === userId;
+
+  if (!isChairman && !isUploader) {
+    throw new ForbiddenError('You do not have permission to delete this document');
+  }
+
+  return prisma.departmentDocument.delete({ where: { id: documentId } });
+}
 }
 
 export const memberAffairsService = new MemberAffairsService();
