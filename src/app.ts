@@ -27,7 +27,7 @@ const app: Application = express();
 // ─── Security ───────────────────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// Define allowed origins dynamically to support credentials
+// Exact matches for production and regular local development
 const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
@@ -37,7 +37,16 @@ const allowedOrigins = [
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        const isExactMatch = allowedOrigins.includes(origin);
+        const isVercelPreview = origin.endsWith('.vercel.app');
+        const isLocalhost = origin.startsWith('http://localhost:');
+
+        // Allow if it matches our exact list, a Vercel deployment, or a local port
+        if (isExactMatch || isVercelPreview || isLocalhost) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -45,7 +54,7 @@ app.use(cors({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
 // ─── Body Parsing ───────────────────────────────────────────────────
