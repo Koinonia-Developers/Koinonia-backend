@@ -1,7 +1,9 @@
-import express, { Application } from 'express';
+import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
+import cookieParser from 'cookie-parser';
+
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -24,20 +26,31 @@ const app: Application = express();
 
 // ─── Security ───────────────────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// Define allowed origins dynamically to support credentials
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://endaeyesusbete.vercel.app'
+];
+
 app.use(cors({
-    origin: [
-        env.FRONTEND_URL || 'http://localhost:3001',
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'https://endaeyesusbete.vercel.app'
-    ],
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // ─── Body Parsing ───────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-import cookieParser from 'cookie-parser';
 app.use(cookieParser());
 
 // ─── Static Files (uploaded images) ────────────────────────────────
@@ -60,7 +73,7 @@ app.use('/api/v1/education', educationRoutes);
 app.use('/api/v1/approvals', approvalsRoutes);
 
 // ─── Health Check ───────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
