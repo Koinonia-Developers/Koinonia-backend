@@ -23,11 +23,12 @@ import educationRoutes from './routes/education.routes';
 import approvalsRoutes from './routes/approvals.routes';
 
 const app: Application = express();
+app.set('trust proxy', 1);
 
 // ─── Security ───────────────────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// Exact matches for production and regular local development
+// CORS
 const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
@@ -36,16 +37,12 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) {
             return callback(null, true);
         }
-
         const isExactMatch = allowedOrigins.includes(origin);
         const isVercelPreview = origin.endsWith('.vercel.app');
         const isLocalhost = origin.startsWith('http://localhost:');
-
-        // Allow if it matches our exact list, a Vercel deployment, or a local port
         if (isExactMatch || isVercelPreview || isLocalhost) {
             callback(null, true);
         } else {
@@ -63,6 +60,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ─── Static Files (uploaded images) ────────────────────────────────
+// This can be removed after confirming Cloudinary works; keeping it for backward compatibility.
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // ─── Routes ─────────────────────────────────────────────────────────

@@ -26,6 +26,7 @@
     "@types/node": "^25.3.0",
     "@types/pg": "^8.16.0",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -37,6 +38,7 @@
     "node-cron": "^3.0.3",
     "pg": "^8.18.0",
     "prisma": "^5.22.0",
+    "streamifier": "^0.1.1",
     "typescript": "^5.9.3",
     "zod": "^4.3.6"
   },

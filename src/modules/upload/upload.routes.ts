@@ -1,20 +1,23 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import path from 'path';
 import { requireAuth, requireActiveStatus } from '../../middleware/auth';
 import { BadRequestError } from '../../utils/errors';
+import { v2 as cloudinary, UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
+// streamifier doesn't have types; use require to bypass or add declaration
+const streamifier = require('streamifier');
 
-// Store uploaded files in uploads/ directory
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, 'uploads/'),
-    filename: (_req, file, cb) => {
-        const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        cb(null, `${unique}${path.extname(file.originalname)}`);
-    },
+// ─── Cloudinary Configuration ──────────────────────────────────────
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// ─── Multer Memory Storage ─────────────────────────────────────────
+const storage = multer.memoryStorage();
+
 const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-    const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowedImages = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     const allowedVideos = ['video/mp4', 'video/webm', 'video/ogg'];
     const allowedPDFs = ['application/pdf'];
     
@@ -28,21 +31,41 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFil
 const upload = multer({
     storage,
     fileFilter,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB for PDFs and videos
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
 const router = Router();
+
+// ─── Helper: Upload to Cloudinary ─────────────────────────────────
+async function uploadToCloudinary(buffer: Buffer, folder: string, resourceType: 'image' | 'video' | 'raw'): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: resourceType,
+            },
+            (err: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
+                if (err) return reject(err);
+                if (!result) return reject(new Error('No result from Cloudinary'));
+                resolve(result.secure_url);
+            }
+        );
+        streamifier.createReadStream(buffer).pipe(uploadStream);
+    });
+}
+
+// ─── Routes ─────────────────────────────────────────────────────────
 
 router.post(
     '/image',
     requireAuth,
     requireActiveStatus,
     upload.single('image'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
         try {
             if (!req.file) throw new BadRequestError('No image file provided');
-            const imageURL = `/uploads/${req.file.filename}`;
-            res.status(200).json({ status: 'success', data: { imageURL } });
+            const url = await uploadToCloudinary(req.file.buffer, 'announcements/images', 'image');
+            res.status(200).json({ status: 'success', data: { imageURL: url } });
         } catch (e) {
             next(e);
         }
@@ -54,11 +77,11 @@ router.post(
     requireAuth,
     requireActiveStatus,
     upload.single('video'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
         try {
             if (!req.file) throw new BadRequestError('No video file provided');
-            const videoURL = `/uploads/${req.file.filename}`;
-            res.status(200).json({ status: 'success', data: { videoURL } });
+            const url = await uploadToCloudinary(req.file.buffer, 'announcements/videos', 'video');
+            res.status(200).json({ status: 'success', data: { videoURL: url } });
         } catch (e) {
             next(e);
         }
@@ -70,26 +93,26 @@ router.post(
     requireAuth,
     requireActiveStatus,
     upload.single('pdf'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
         try {
             if (!req.file) throw new BadRequestError('No PDF file provided');
-            const pdfURL = `/uploads/${req.file.filename}`;
-            res.status(200).json({ status: 'success', data: { pdfURL } });
+            const url = await uploadToCloudinary(req.file.buffer, 'announcements/pdfs', 'raw');
+            res.status(200).json({ status: 'success', data: { pdfURL: url } });
         } catch (e) {
             next(e);
         }
     }
 );
 
-// Special route for registration/public uploads that don't have a token yet
+// Public upload (registration profile pictures – no auth)
 router.post(
     '/public-image',
     upload.single('image'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
         try {
             if (!req.file) throw new BadRequestError('No image file provided');
-            const imageURL = `/uploads/${req.file.filename}`;
-            res.status(200).json({ status: 'success', data: { imageURL } });
+            const url = await uploadToCloudinary(req.file.buffer, 'profiles', 'image');
+            res.status(200).json({ status: 'success', data: { imageURL: url } });
         } catch (e) {
             next(e);
         }
