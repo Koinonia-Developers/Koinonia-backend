@@ -23,6 +23,7 @@ import lmsRoutes from './modules/lms/lms.routes';
 import memberAffairsRoutes from './routes/memberAffairs.routes'; 
 import educationRoutes from './routes/education.routes';
 import approvalsRoutes from './routes/approvals.routes';
+import courseSubmissionsRoutes from './modules/course-submissions/course-submissions.routes';
 
 const app: Application = express();
 app.set('trust proxy', 1);
@@ -85,6 +86,7 @@ app.use('/api/v1/lms', lmsRoutes);
 app.use('/api/v1/member-affairs', memberAffairsRoutes);  
 app.use('/api/v1/education', educationRoutes);
 app.use('/api/v1/approvals', approvalsRoutes);
+app.use('/api/v1/lms/submissions', courseSubmissionsRoutes);
 
 // ─── Health Check ───────────────────────────────────────────────────
 app.get('/health', (_req: Request, res: Response) => {
