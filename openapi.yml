@@ -1,0 +1,482 @@
+openapi: 3.0.0
+info:
+  title: KOIN LMS Course Submissions API
+  description: API for managing course submissions by teachers and review by education managers.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /lms/submissions:
+    post:
+      summary: Create a new course submission
+      description: Creates a new course submission. Status defaults to DRAFT or SUBMITTED depending on the `submit_immediately` flag.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubmissionRequest'
+      responses:
+        '201':
+          description: Created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseSubmission'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    get:
+      summary: List paginated submissions
+      description: Returns a paginated list of submissions. Teachers can only see their own. Managers/Admins can see all and filter by teacher_id or batch_id.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: batch_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/SubmissionStatus'
+        - name: teacher_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSubmissionsResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /lms/submissions/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Submission ID
+    get:
+      summary: Get single submission details
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseSubmissionWithRelations'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      summary: Update title or content package
+      description: Only allowed if in DRAFT or REJECTED status. Must be owner.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubmissionRequest'
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseSubmission'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      summary: Delete a submission
+      description: Allowed for owner if DRAFT/REJECTED, or Admin at any time.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /lms/submissions/{id}/submit:
+    patch:
+      summary: Submit a draft for review
+      description: Transitions status DRAFT ➔ SUBMITTED. Must be owner.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseSubmission'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /lms/submissions/{id}/review:
+    patch:
+      summary: Approve/Reject submission with feedback
+      description: Education Manager only. Status must be UNDER_REVIEW, APPROVED, or REJECTED.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewSubmissionRequest'
+      responses:
+        '200':
+          description: Reviewed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseSubmission'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /lms/submissions/{id}/publish:
+    patch:
+      summary: Set implemented_page_url and publish
+      description: Education Manager only. Transition to PUBLISHED or IMPLEMENTATION_IN_PROGRESS.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishSubmissionRequest'
+      responses:
+        '200':
+          description: Published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseSubmission'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SubmissionStatus:
+      type: string
+      enum:
+        - DRAFT
+        - SUBMITTED
+        - UNDER_REVIEW
+        - APPROVED
+        - REJECTED
+        - IMPLEMENTATION_IN_PROGRESS
+        - PUBLISHED
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: 'fail'
+        message:
+          type: string
+          example: 'Error message description'
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: 'fail'
+        message:
+          type: string
+          example: 'Validation Error'
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              message:
+                type: string
+
+    CreateSubmissionRequest:
+      type: object
+      required:
+        - batch_id
+        - title
+        - content_package
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 200
+        content_package:
+          type: string
+          description: JSON string containing course content
+        submit_immediately:
+          type: boolean
+          default: false
+
+    UpdateSubmissionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content_package:
+          type: string
+
+    ReviewSubmissionRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/SubmissionStatus'
+          description: UNDER_REVIEW, APPROVED, or REJECTED
+        review_feedback:
+          type: string
+
+    PublishSubmissionRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/SubmissionStatus'
+          description: IMPLEMENTATION_IN_PROGRESS or PUBLISHED
+        implemented_page_url:
+          type: string
+          format: uri
+
+    CourseSubmission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        teacher_id:
+          type: string
+          format: uuid
+        batch_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content_package:
+          type: string
+        status:
+          $ref: '#/components/schemas/SubmissionStatus'
+        review_feedback:
+          type: string
+          nullable: true
+        implemented_page_url:
+          type: string
+          nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        implemented_at:
+          type: string
+          format: date-time
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CourseSubmissionWithRelations:
+      allOf:
+        - $ref: '#/components/schemas/CourseSubmission'
+        - type: object
+          properties:
+            lms_batches:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                code:
+                  type: string
+            users_course_submissions_teacher_idTousers:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                full_name_three_parts:
+                  type: string
+                email:
+                  type: string
+                profile_image_url:
+                  type: string
+            created_by_user:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                full_name_three_parts:
+                  type: string
+                email:
+                  type: string
+                profile_image_url:
+                  type: string
+
+    PaginatedSubmissionsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseSubmissionWithRelations'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+
+  responses:
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFoundError:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
