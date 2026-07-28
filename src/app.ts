@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
 
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
@@ -62,6 +64,11 @@ app.use(cookieParser());
 // ─── Static Files (uploaded images) ────────────────────────────────
 // This can be removed after confirming Cloudinary works; keeping it for backward compatibility.
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// ─── 🆕 Swagger UI Documentation ──────────────────────────────────
+// Load the OpenAPI specification file (located at the project root)
+const swaggerDocument = YAML.load(path.join(__dirname, '../openapi.yml'));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // ─── Routes ─────────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);

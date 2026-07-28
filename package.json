@@ -39,12 +39,16 @@
     "pg": "^8.18.0",
     "prisma": "^5.22.0",
     "streamifier": "^0.1.1",
+    "swagger-ui-express": "^5.0.1",
     "typescript": "^5.9.3",
+    "yamljs": "^0.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/node-cron": "^3.0.11",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/yamljs": "^0.2.34",
     "ts-node-dev": "^2.0.0"
   }
 }
