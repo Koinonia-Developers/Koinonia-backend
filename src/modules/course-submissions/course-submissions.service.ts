@@ -26,7 +26,13 @@ export class CourseSubmissionsService {
             where: { id },
             include: {
                 lms_batches: {
-                    select: { id: true, title: true, code: true }
+                    select: { 
+                        id: true, 
+                        course_track: true, 
+                        batch_number: true, 
+                        academic_year: true, 
+                        status: true 
+                    }
                 },
                 users_course_submissions_teacher_idTousers: {
                     select: { id: true, full_name_three_parts: true, email: true, profile_image_url: true }
@@ -70,7 +76,13 @@ export class CourseSubmissionsService {
             },
             include: {
                 lms_batches: {
-                    select: { id: true, title: true, code: true }
+                    select: { 
+                        id: true, 
+                        course_track: true, 
+                        batch_number: true, 
+                        academic_year: true, 
+                        status: true 
+                    }
                 }
             }
         });
@@ -81,27 +93,33 @@ export class CourseSubmissionsService {
     // ─── LIST ──────────────────────────────────────────────────────
 
     async list(user: JwtPayload, query: ListSubmissionsQuery) {
-        const { page, limit, batch_id, status, teacher_id } = query;
+        // ✅ FIX: Parse page and limit as numbers
+        const page = Number(query.page) || 1;
+        const limit = Number(query.limit) || 20;
         const skip = (page - 1) * limit;
 
-        // Data scoping: Teachers see only their own submissions
-        let scopedTeacherId: string | undefined = undefined;
-        let isManager = this.isEducationManager(user);
+        const { batch_id, status, teacher_id } = query;
 
-        if (user.role === 'TEACHER' && !isManager) {
-            scopedTeacherId = user.userID;
-        }
+        // Check roles explicitly
+        const isEducationManager = this.isEducationManager(user);
+        const isTeacher = user.role === 'TEACHER';
 
         // Build where clause
         const where: any = {};
 
+        // Apply filters
         if (batch_id) where.batch_id = batch_id;
         if (status) where.status = status;
-        if (teacher_id && isManager) where.teacher_id = teacher_id;
-        if (scopedTeacherId) where.teacher_id = scopedTeacherId;
 
-        // If user is not a teacher and not a manager, they cannot see submissions
-        if (user.role !== 'TEACHER' && !isManager) {
+        // Data scoping:
+        // - Education Managers can see ALL submissions (optionally filtered by teacher_id)
+        // - Teachers see only their OWN submissions
+        if (isEducationManager && teacher_id) {
+            where.teacher_id = teacher_id;
+        } else if (isTeacher && !isEducationManager) {
+            where.teacher_id = user.userID;
+        } else if (!isTeacher && !isEducationManager) {
+            // User has NO access to submissions
             return {
                 data: [],
                 total: 0,
@@ -117,14 +135,20 @@ export class CourseSubmissionsService {
                 where,
                 include: {
                     lms_batches: {
-                        select: { id: true, title: true, code: true }
+                        select: { 
+                            id: true, 
+                            course_track: true, 
+                            batch_number: true, 
+                            academic_year: true, 
+                            status: true 
+                        }
                     },
                     users_course_submissions_teacher_idTousers: {
                         select: { id: true, full_name_three_parts: true, email: true, profile_image_url: true }
                     }
                 },
                 orderBy: { updated_at: 'desc' },
-                skip,
+                skip: skip,
                 take: limit,
             }),
             db.course_submissions.count({ where })
@@ -183,7 +207,13 @@ export class CourseSubmissionsService {
             data: updateData,
             include: {
                 lms_batches: {
-                    select: { id: true, title: true, code: true }
+                    select: { 
+                        id: true, 
+                        course_track: true, 
+                        batch_number: true, 
+                        academic_year: true, 
+                        status: true 
+                    }
                 }
             }
         });
@@ -215,7 +245,13 @@ export class CourseSubmissionsService {
             },
             include: {
                 lms_batches: {
-                    select: { id: true, title: true, code: true }
+                    select: { 
+                        id: true, 
+                        course_track: true, 
+                        batch_number: true, 
+                        academic_year: true, 
+                        status: true 
+                    }
                 }
             }
         });
@@ -249,7 +285,13 @@ export class CourseSubmissionsService {
             },
             include: {
                 lms_batches: {
-                    select: { id: true, title: true, code: true }
+                    select: { 
+                        id: true, 
+                        course_track: true, 
+                        batch_number: true, 
+                        academic_year: true, 
+                        status: true 
+                    }
                 }
             }
         });
@@ -287,7 +329,6 @@ export class CourseSubmissionsService {
 
         if (data.status === 'PUBLISHED') {
             updateData.published_at = new Date();
-            // If directly publishing without implementation phase
             if (!submission.implemented_at) {
                 updateData.implemented_at = new Date();
             }
@@ -298,7 +339,13 @@ export class CourseSubmissionsService {
             data: updateData,
             include: {
                 lms_batches: {
-                    select: { id: true, title: true, code: true }
+                    select: { 
+                        id: true, 
+                        course_track: true, 
+                        batch_number: true, 
+                        academic_year: true, 
+                        status: true 
+                    }
                 }
             }
         });
