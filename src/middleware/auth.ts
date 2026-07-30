@@ -7,7 +7,7 @@ export interface JwtPayload {
     userID: string;
     role: 'USER' | 'MEMBER' | 'TEACHER' | 'SERVICE_MANAGER' | 'SECRETARIAT_SECRETARY' | 'SECRETARIAT_VICE' | 'SECRETARIAT_CHAIRMAN' | 'SUPER_ADMIN' | 'CLASS_LEADER';
     serviceClassID: string | null;
-    serviceClassName?: string | null;  // ADD THIS
+    serviceClassName?: string | null;
     classLeaderOf?: string | null;
     status: string;
 }
@@ -49,8 +49,14 @@ export const requireRole = (allowedRoles: Array<string>) => {
         
         const userRole = req.user.role;
 
-        // SECRETARIAT_CHAIRMAN has absolute structural priority and bypass authority over all system routes
+        // SECRETARIAT_CHAIRMAN and SUPER_ADMIN bypass all role checks
         if (userRole === 'SECRETARIAT_CHAIRMAN' || userRole === 'SUPER_ADMIN') {
+            return next();
+        }
+
+        // ✅ FIX: SERVICE_MANAGER (Education Manager) has full TEACHER privileges
+        // This allows Education Managers to create, edit, submit, and delete submissions
+        if (allowedRoles.includes('TEACHER') && userRole === 'SERVICE_MANAGER') {
             return next();
         }
 
