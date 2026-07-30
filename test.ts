@@ -14,10 +14,11 @@ async function main() {
         const res = await prisma.notification.createMany({
             data: [
                 {
-                    userID: user.id,
-                    actorID: user.id,
-                    type: 'POST',
-                    content: 'Test notification payload'
+                    user_id: user.id,          // ✅ correct field name
+                    title: 'Test Notification', // ✅ required field
+                    message: 'Test notification payload', // optional field
+                    type: 'POST',               // optional but you can keep it
+                    is_read: false,             // optional (default is false)
                 }
             ]
         });

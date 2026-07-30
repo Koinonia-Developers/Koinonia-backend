@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
 
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
@@ -21,6 +23,7 @@ import lmsRoutes from './modules/lms/lms.routes';
 import memberAffairsRoutes from './routes/memberAffairs.routes'; 
 import educationRoutes from './routes/education.routes';
 import approvalsRoutes from './routes/approvals.routes';
+import courseSubmissionsRoutes from './modules/course-submissions/course-submissions.routes';
 
 const app: Application = express();
 app.set('trust proxy', 1);
@@ -63,6 +66,11 @@ app.use(cookieParser());
 // This can be removed after confirming Cloudinary works; keeping it for backward compatibility.
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+// ─── 🆕 Swagger UI Documentation ──────────────────────────────────
+// Load the OpenAPI specification file (located at the project root)
+const swaggerDocument = YAML.load(path.join(__dirname, '../openapi.yml'));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // ─── Routes ─────────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
@@ -78,6 +86,7 @@ app.use('/api/v1/lms', lmsRoutes);
 app.use('/api/v1/member-affairs', memberAffairsRoutes);  
 app.use('/api/v1/education', educationRoutes);
 app.use('/api/v1/approvals', approvalsRoutes);
+app.use('/api/v1/lms/submissions', courseSubmissionsRoutes);
 
 // ─── Health Check ───────────────────────────────────────────────────
 app.get('/health', (_req: Request, res: Response) => {

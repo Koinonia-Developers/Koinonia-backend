@@ -54,73 +54,74 @@ export class EducationService {
   async createSubject(data: { batchId: string; title: string; description?: string; order: number }) {
     return prisma.subject.create({ data });
   }
-async addInlineExplanation(lessonId: string, quotedText: string, explanation: string) {
-  // lessonId can be any string (e.g., "les_abew_1") – no foreign key validation
-  return prisma.inlineExplanation.create({
-    data: { lessonId, quotedText, explanation },
-  });
-}
+  
+  async addInlineExplanation(lessonId: string, quotedText: string, explanation: string) {
+    // lessonId can be any string (e.g., "les_abew_1") – no foreign key validation
+    return prisma.inlineExplanation.create({
+      data: { lessonId, quotedText, explanation },
+    });
+  }
 
-async getLessonExplanations(lessonId: string) {
-  return prisma.inlineExplanation.findMany({
-    where: { lessonId },
-    orderBy: { createdAt: 'asc' },
-  });
-}
-async updateExplanation(explanationId: string, quotedText: string, explanation: string) {
-  return prisma.inlineExplanation.update({
-    where: { id: explanationId },
-    data: { quotedText, explanation },
-  });
-}
+  async getLessonExplanations(lessonId: string) {
+    return prisma.inlineExplanation.findMany({
+      where: { lessonId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+  
+  async updateExplanation(explanationId: string, quotedText: string, explanation: string) {
+    return prisma.inlineExplanation.update({
+      where: { id: explanationId },
+      data: { quotedText, explanation },
+    });
+  }
 
-
-async deleteExplanation(explanationId: string) {
-  return prisma.inlineExplanation.delete({
-    where: { id: explanationId },
-  });
-}
+  async deleteExplanation(explanationId: string) {
+    return prisma.inlineExplanation.delete({
+      where: { id: explanationId },
+    });
+  }
+  
   // ✅ Get all members of education class (full roster)
-async getEducationClassMembers() {
-  const educationClass = await prisma.serviceClass.findFirst({
-    where: { class_name_amharic: 'የትምህርት ክፍል' },
-  });
-  if (!educationClass) throw new NotFoundError('Education service class not found');
+  async getEducationClassMembers() {
+    const educationClass = await prisma.serviceClass.findFirst({
+      where: { class_name_amharic: 'የትምህርት ክፍል' },
+    });
+    if (!educationClass) throw new NotFoundError('Education service class not found');
 
-  const members = await prisma.user.findMany({
-    where: {
-      service_class_id: educationClass.id,
-      system_role: 'MEMBER',
-    },
-    include: {
-      // Use the exact relation names from your schema
-      users_users_spiritual_father_idTousers: { select: { full_name_three_parts: true } },
-      users_users_spiritual_mother_idTousers: { select: { full_name_three_parts: true } },
-      users_users_repentance_father_idTousers: { select: { full_name_three_parts: true } },
-      users_users_repentance_deacon_idTousers: { select: { full_name_three_parts: true } },
-    },
-    orderBy: { full_name_three_parts: 'asc' },
-  });
+    const members = await prisma.user.findMany({
+      where: {
+        service_class_id: educationClass.id,
+        system_role: 'MEMBER',
+      },
+      include: {
+        users_users_spiritual_father_idTousers: { select: { full_name_three_parts: true } },
+        users_users_spiritual_mother_idTousers: { select: { full_name_three_parts: true } },
+        users_users_repentance_father_idTousers: { select: { full_name_three_parts: true } },
+        users_users_repentance_deacon_idTousers: { select: { full_name_three_parts: true } },
+      },
+      orderBy: { full_name_three_parts: 'asc' },
+    });
 
-  // Rename the nested objects to simpler property names for the frontend
-  return members.map(member => ({
-    id: member.id,
-    full_name_three_parts: member.full_name_three_parts,
-    email: member.email,
-    university_id: member.university_id,
-    phone_number: member.phone_number,
-    academic_year: member.academic_year,
-    academic_dept: member.academic_dept,
-    dorm_block: member.dorm_block,
-    dorm_room: member.dorm_room,
-    is_active: member.is_active,
-    created_at: member.created_at,
-    spiritual_father: member.users_users_spiritual_father_idTousers,
-    spiritual_mother: member.users_users_spiritual_mother_idTousers,
-    repentance_father: member.users_users_repentance_father_idTousers,
-    repentance_deacon: member.users_users_repentance_deacon_idTousers,
-  }));
-}
+    // Rename the nested objects to simpler property names for the frontend
+    return members.map(member => ({
+      id: member.id,
+      full_name_three_parts: member.full_name_three_parts,
+      email: member.email,
+      university_id: member.university_id,
+      phone_number: member.phone_number,
+      academic_year: member.academic_year,
+      academic_dept: member.academic_dept,
+      dorm_block: member.dorm_block,
+      dorm_room: member.dorm_room,
+      is_active: member.is_active,
+      created_at: member.created_at,
+      spiritual_father: member.users_users_spiritual_father_idTousers,
+      spiritual_mother: member.users_users_spiritual_mother_idTousers,
+      repentance_father: member.users_users_repentance_father_idTousers,
+      repentance_deacon: member.users_users_repentance_deacon_idTousers,
+    }));
+  }
 
   // ✅ Get enrolled members (for graduation) – all users with enrollments
   async getEnrolledMembers() {
@@ -167,7 +168,7 @@ async getEducationClassMembers() {
       try {
         graduatedPhases = JSON.parse(user.graduated_phases as string);
       } catch {
-        graduatedPhases = [];
+        // Intentionally empty - handles invalid JSON gracefully
       }
     }
 
@@ -216,7 +217,7 @@ async getEducationClassMembers() {
       try {
         graduatedPhases = JSON.parse(user.graduated_phases as string);
       } catch {
-        graduatedPhases = [];
+        // Intentionally empty - handles invalid JSON gracefully
       }
     }
 
@@ -316,24 +317,24 @@ async getEducationClassMembers() {
   }
 
   // -------------------- HELPER: Get all Education Manager IDs --------------------
- private async getEducationManagerIds(): Promise<string[]> {
-  // First, get the education service class ID
-  const educationClass = await prisma.serviceClass.findFirst({
-    where: { class_name_amharic: 'የትምህርት ክፍል' },
-    select: { id: true },
-  });
-  if (!educationClass) return [];
+  private async getEducationManagerIds(): Promise<string[]> {
+    // First, get the education service class ID
+    const educationClass = await prisma.serviceClass.findFirst({
+      where: { class_name_amharic: 'የትምህርት ክፍል' },
+      select: { id: true },
+    });
+    if (!educationClass) return [];
 
-  const managers = await prisma.user.findMany({
-    where: {
-      system_role: 'SERVICE_MANAGER',
-      service_class_id: educationClass.id,
-      is_active: true,
-    },
-    select: { id: true },
-  });
-  return managers.map(m => m.id);
-}
+    const managers = await prisma.user.findMany({
+      where: {
+        system_role: 'SERVICE_MANAGER',
+        service_class_id: educationClass.id,
+        is_active: true,
+      },
+      select: { id: true },
+    });
+    return managers.map(m => m.id);
+  }
 
   // -------------------- ENROLLMENTS (Member) --------------------
   async getMyEnrollment(userId: string, phase: string) {
@@ -357,7 +358,7 @@ async getEducationClassMembers() {
           graduatedPhases.push(...parsed.map(p => p.toUpperCase()));
         }
       } catch {
-        // ignore
+        // Intentionally empty - handles invalid JSON gracefully
       }
     }
 
@@ -508,7 +509,9 @@ async getEducationClassMembers() {
       try {
         const parsed = JSON.parse(user.graduated_phases as string);
         if (Array.isArray(parsed)) graduatedPhases.push(...parsed);
-      } catch {}
+      } catch {
+        // Intentionally empty - handles invalid JSON gracefully
+      }
     }
     if (!graduatedPhases.includes(phase.toLowerCase())) {
       graduatedPhases.push(phase.toLowerCase());
